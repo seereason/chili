@@ -1281,7 +1281,7 @@ instance Show (Html model) where
   show (CData t) = "CData " <> Text.unpack t
   show (Cntl _ e _) = "Cntl " ++ show e
 
-data Control event = forall model. Control
+data Control event = forall model. (Show model) => Control
   { cmodel  :: model
   , cview   :: model -> Html model
   }
@@ -1302,7 +1302,7 @@ flattenCData (CData a : CData b : rest) = flattenCData (CData (a <> b) : rest)
 flattenCData (h : t) = h : flattenCData t
 flattenCData [] = []
 
-type Loop = forall model. JSDocument -> JSNode -> model -> (model -> Html model) -> IO ()
+type Loop = forall model. (Show model) => JSDocument -> JSNode -> model -> (model -> Html model) -> IO ()
 
 renderHtml :: (MonadIO m) => Loop -> ((model -> IO model) -> IO ()) -> JSDocument -> Html model -> m (Maybe JSNode)
 renderHtml _ _ doc (CData t) = fmap (fmap toJSNode) $ createJSTextNode doc t
@@ -1316,22 +1316,24 @@ renderHtml loop withModel doc (Element tag attrs children) =
                 return (Just $ toJSNode e)
     where
       doAttr elem (Attr k v)   = setAttribute elem k v
-      doAttr elem (EL eventType eventHandler) =
+      doAttr elem (EL eventType eventHandler) = do
+        liftIO $ putStrLn $ "Adding event listener for " ++ show eventType
         addEventListener elem eventType (\e -> withModel (eventHandler e)) False
-{-
+
 renderHtml loop withModel doc (Cntl (Control cmodel cview) eventType eventHandler) =
-  do -- (Just cBody) <- renderHtml loop (\f -> pure ()) doc (Element (Text.pack "div") [] [])
-     (Just cBody) <- fmap toJSNode <$> createJSElement doc (Text.pack "div")
+  do (Just cBody) <- fmap toJSNode <$> createJSElement doc (Text.pack "span")
      tid <- liftIO $ forkIO $ loop doc cBody cmodel cview
      addEventListener cBody eventType (\e -> withModel (eventHandler e)) False
      pure (Just cBody)
--}
 
+{-
 renderHtml loop withModel doc (Cntl (Control cmodel cview) eventType eventHandler) =
-  do (Just html) <- renderHtml loop (\f -> pure ()) doc (cview cmodel)
-     addEventListener html eventType (\e -> withModel (eventHandler e)) False
-     pure (Just html)
-
+  do (Just cBody) <- fmap toJSNode <$> createJSElement doc (Text.pack "div")
+     (Just html) <- renderHtml loop (\f -> f cmodel >> pure ()) doc (cview cmodel)
+     appendChild cBody (Just html)
+     addEventListener cBody eventType (\e -> withModel (eventHandler e)) False
+     pure (Just cBody)
+-}
 
 {-
 data Attr action where

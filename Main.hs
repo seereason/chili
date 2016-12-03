@@ -10,6 +10,7 @@ import Control.Monad.Trans (MonadIO(..))
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TMVar (TMVar, newTMVar, newEmptyTMVar, takeTMVar, putTMVar)
 import Data.Char (chr)
+import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.JSString as JS
@@ -19,72 +20,92 @@ import Patch (apply)
 import GHCJS.Foreign (jsNull)
 import GHCJS.Types (JSVal(..), JSString(..))
 import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
-import Types (Attr(..), Control(..), EventTarget(..), EventObject(..), Event(..), IsEventTarget(..), IsEventObject(..), IsEvent(..), EventObjectOf(..), Html(..), JSDocument, JSNode, MouseEvent(..), MouseEventObject(..), js_alert, addEventListener, appendChild, currentDocument, currentTarget, createJSElement, createJSTextNode, dispatchEvent, getElementsByTagName, item, parentNode, removeChildren, setAttribute, toJSNode, maybeJSNullOrUndefined, unJSNode, target, renderHtml)
+import Types (Attr(..), Control(..), EventTarget(..), EventObject(..), Event(..), IsEventTarget(..), IsEventObject(..), IsEvent(..), EventObjectOf(..), Html(..), JSDocument, JSNode, MouseEvent(..), MouseEventObject(..), js_alert, addEventListener, appendChild, currentDocument, currentTarget, createJSElement, createJSTextNode, dispatchEvent, getElementsByTagName, item, parentNode, removeChildren, setAttribute, toJSNode, maybeJSNullOrUndefined, unJSNode, target, renderHtml, stopPropagation)
 
-foreign import javascript unsafe "new Event($1)"
-        js_newEvent :: JSString -> IO JSVal
 
-class (IsEvent ev) => MkEvent ev where
-  mkEvent :: ev -> JSVal -> EventObjectOf ev
+-- * Custom button tag which emits `Flicked` instead of `Click`
 
-newEvent :: forall ev. (IsEvent ev, MkEvent ev) => ev -> IO (EventObjectOf ev)
-newEvent ev =
-  do let evStr = eventToJSString ev
-     jsval <- js_newEvent evStr
-     pure $ mkEvent ev jsval
 
-data ToggleEvent = Toggled
+-- | custom `MyButtonEvent`
+data MyButtonEvent = Flicked
  deriving (Eq, Show)
 
-instance IsEvent ToggleEvent where
-  eventToJSString Toggled = "flicked"
+-- | way too much boilerplate
+instance IsEvent MyButtonEvent where
+  eventToJSString Flicked = "flicked"
 
-instance MkEvent ToggleEvent where
-  mkEvent _ jsval = ToggleEventObject jsval
+instance MkEvent MyButtonEvent where
+  mkEvent _ jsval = MyButtonEventObject jsval
 
-newtype ToggleEventObject = ToggleEventObject { unToggleEventObject :: JSVal }
+newtype MyButtonEventObject = MyButtonEventObject { unMyButtonEventObject :: JSVal }
 
-instance Show ToggleEventObject where
-  show _ = "ToggleEventObject"
+instance Show MyButtonEventObject where
+  show _ = "MyButtonEventObject"
 
-instance ToJSVal ToggleEventObject where
-  toJSVal = return . unToggleEventObject
+instance ToJSVal MyButtonEventObject where
+  toJSVal = return . unMyButtonEventObject
   {-# INLINE toJSVal #-}
 
-instance FromJSVal ToggleEventObject where
-  fromJSVal = return . fmap ToggleEventObject . maybeJSNullOrUndefined
+instance FromJSVal MyButtonEventObject where
+  fromJSVal = return . fmap MyButtonEventObject . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
-instance IsEventObject ToggleEventObject where
-  asEventObject (ToggleEventObject jsval) = EventObject jsval
+instance IsEventObject MyButtonEventObject where
+  asEventObject (MyButtonEventObject jsval) = EventObject jsval
 
-type instance EventObjectOf ToggleEvent   = ToggleEventObject
+type instance EventObjectOf MyButtonEvent   = MyButtonEventObject
 
-
-
-myButton :: Text -> Control ToggleEvent
+-- | implementation of myButton
+--
+-- Note that is uses the model/view pattern
+--
+-- This button displays how many times it has been clicked
+myButton :: Text -> Control MyButtonEvent
 myButton msg =
-  Control { cmodel = ()
-          , cview = \() ->
-              Element "button" [EL Click (\e m -> do toggleEventObject <- newEvent Toggled ; putStrLn "dispatching event" ; dispatchEvent (target e) toggleEventObject ; pure ()) ]
-               [CData msg]
+  Control { cmodel = 0
+          , cview = \i ->
+              Element "button" [EL Click clickHandler]
+               [CData (msg <> " " <> T.pack (show i))]
           }
+  where
+    clickHandler e m = do
+      stopPropagation e
+      toggleEventObject <- newEvent Flicked True True
+      dispatchEvent (target e) toggleEventObject
+      pure (succ m)
 
+-- | an app which uses `myButton`
+--
+-- We have two buttons, which increment the global counter.
+-- One regular button and one myButton.
+--
+-- We do not show the `myButton` until the global counter is >= 2
 app :: Int -> Html Int
 app model =
   Element "div" []
    ([ Element "p" [] [ CData $ T.pack $ "# clicks: " ++ show model]
    , Element "button" [EL Click (\e m -> pure (succ m))] [CData "click me!"]
---   , Element "button" [EL Click (\e m -> pure (succ m))] [CData "click me!"]
-   ] ++ (if (model >= 0) then [Cntl (myButton "flick me") Toggled (\_ m -> pure $ succ m)] else []))
+   ] ++ (if (model >= 2)
+         then [Cntl (myButton "flick me") Flicked (\_ m -> pure $ succ m)]
+         else []))
 
-loop :: JSDocument
+-- | a pretty standard main function
+main :: IO ()
+main =
+  do (Just doc)   <- currentDocument
+     (Just nodes) <- getElementsByTagName doc "body"
+     (Just body)  <- item nodes 0
+     loop doc body 0 app
+
+
+loop :: (Show model) => JSDocument
      -> JSNode
      -> model
      -> (model -> Html model)
      -> IO ()
 loop doc body initModel view =
-  do modelV <- atomically $ newEmptyTMVar
+  do putStrLn "loop"
+     modelV <- atomically $ newEmptyTMVar
 --     model <- atomically $ readTVar modelV
      let html = view initModel
      (Just node) <- renderHtml loop (updateModel modelV) doc html
@@ -93,8 +114,10 @@ loop doc body initModel view =
      loop' modelV initModel html
        where
          loop' modelV oldModel oldHtml =
-           do f <- atomically $ takeTMVar modelV
+           do putStrLn "loop'"
+              f <- atomically $ takeTMVar modelV
               model <- f oldModel
+              print (model, oldModel)
               let newHtml = view model
                   patches = diff oldHtml (Just newHtml)
               print patches
@@ -102,13 +125,18 @@ loop doc body initModel view =
               loop' modelV model newHtml
          updateModel modelV f = atomically $ putTMVar modelV f
 
-main :: IO ()
-main =
-  do (Just doc)   <- currentDocument
-     (Just nodes) <- getElementsByTagName doc "body"
-     (Just body)  <- item nodes 0
-     loop doc body 0 app
 
+foreign import javascript unsafe "new Event($1, { 'bubbles' : $2, 'cancelable' : $3})"
+        js_newEvent :: JSString -> Bool -> Bool -> IO JSVal
+
+class (IsEvent ev) => MkEvent ev where
+  mkEvent :: ev -> JSVal -> EventObjectOf ev
+
+newEvent :: forall ev. (IsEvent ev, MkEvent ev) => ev -> Bool -> Bool -> IO (EventObjectOf ev)
+newEvent ev bubbles cancelable =
+  do let evStr = eventToJSString ev
+     jsval <- js_newEvent evStr bubbles cancelable
+     pure $ mkEvent ev jsval
 
 {-
 data FancyInputEvent
