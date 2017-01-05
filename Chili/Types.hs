@@ -1,7 +1,7 @@
 {-# LANGUAGE ExistentialQuantification, FlexibleContexts, FlexibleInstances, GADTs, JavaScriptFFI, ScopedTypeVariables, TemplateHaskell, TypeFamilies #-}
 {-# language GeneralizedNewtypeDeriving #-}
 {-# language RankNTypes #-}
-module Types where
+module Chili.Types where
 
 import Control.Applicative (Applicative, Alternative)
 import Control.Concurrent (forkIO)
@@ -1481,6 +1481,20 @@ instance IsEventObject ClipboardEventObject where
 
 foreign import javascript unsafe "$1[\"clipboardData\"]" clipboardData ::
         ClipboardEventObject -> IO DataTransfer
+
+-- * Event
+
+foreign import javascript unsafe "new Event($1, { 'bubbles' : $2, 'cancelable' : $3})"
+        js_newEvent :: JSString -> Bool -> Bool -> IO JSVal
+
+class (IsEvent ev) => MkEvent ev where
+  mkEvent :: ev -> JSVal -> EventObjectOf ev
+
+newEvent :: forall ev. (IsEvent ev, MkEvent ev) => ev -> Bool -> Bool -> IO (EventObjectOf ev)
+newEvent ev bubbles cancelable =
+  do let evStr = eventToJSString ev
+     jsval <- js_newEvent evStr bubbles cancelable
+     pure $ mkEvent ev jsval
 
 -- * Canvas
 

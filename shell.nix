@@ -16,7 +16,7 @@ let
         executableHaskellDepends = [
           aeson base containers ghcjs-base lens machines mtl text hsx2hs stm
         ];
-        buildTools = [ pkgs.haskellPackages.cabal-install ];
+        buildTools = [ pkgs.haskellPackages.ghc pkgs.haskellPackages.cabal-install ];
         description = "yet another clientside ui library";
         license = stdenv.lib.licenses.bsd3;
       };

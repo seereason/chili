@@ -1,6 +1,7 @@
 name:                chili
 version:             0.1.0.0
 synopsis:            yet another clientside ui library
+description:         Model/View with components that emit browser events
 license:             BSD3
 license-file:        LICENSE
 author:              Jeremy Shaw
@@ -10,8 +11,7 @@ build-type:          Simple
 extra-source-files:  ChangeLog.md, README.md, README.md~
 cabal-version:       >=1.10
 
-executable chili
-  main-is:             Main.hs
+library
   build-depends:       aeson,
                        base >=4.8 && <4.9,
                        containers,
@@ -23,3 +23,10 @@ executable chili
                        stm,
                        text
   default-language:    Haskell2010
+  exposed-modules:
+                  Chili.Diff
+                  Chili.HSX
+                  Chili.Patch
+                  Chili.Types
+                  Chili.Loop
+

@@ -15,12 +15,12 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.JSString as JS
 import Data.JSString.Text (textToJSString, textFromJSString)
-import Diff (diff)
-import Patch (apply)
+import Chili.Loop (loop)
+import Chili.Types (Attr(..), Control(..), EventTarget(..), EventObject(..), Event(..), IsEventTarget(..), IsEventObject(..), IsEvent(..), EventObjectOf(..), Html(..), JSDocument, JSNode, MouseEvent(..), MouseEventObject(..), MkEvent(..), js_alert, addEventListener, appendChild, currentDocument, currentTarget, createJSElement, createJSTextNode, dispatchEvent, getElementsByTagName, item, parentNode, removeChildren, setAttribute, toJSNode, maybeJSNullOrUndefined, newEvent, unJSNode, target, renderHtml, stopPropagation)
 import GHCJS.Foreign (jsNull)
 import GHCJS.Types (JSVal(..), JSString(..))
 import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
-import Types (Attr(..), Control(..), EventTarget(..), EventObject(..), Event(..), IsEventTarget(..), IsEventObject(..), IsEvent(..), EventObjectOf(..), Html(..), JSDocument, JSNode, MouseEvent(..), MouseEventObject(..), js_alert, addEventListener, appendChild, currentDocument, currentTarget, createJSElement, createJSTextNode, dispatchEvent, getElementsByTagName, item, parentNode, removeChildren, setAttribute, toJSNode, maybeJSNullOrUndefined, unJSNode, target, renderHtml, stopPropagation)
+
 
 
 -- * Custom button tag which emits `Flicked` instead of `Click`
@@ -98,45 +98,8 @@ main =
      loop doc body 0 app
 
 
-loop :: (Show model) => JSDocument
-     -> JSNode
-     -> model
-     -> (model -> Html model)
-     -> IO ()
-loop doc body initModel view =
-  do putStrLn "loop"
-     modelV <- atomically $ newEmptyTMVar
---     model <- atomically $ readTVar modelV
-     let html = view initModel
-     (Just node) <- renderHtml loop (updateModel modelV) doc html
-     removeChildren body
-     appendChild body (Just node)
-     loop' modelV initModel html
-       where
-         loop' modelV oldModel oldHtml =
-           do putStrLn "loop'"
-              f <- atomically $ takeTMVar modelV
-              model <- f oldModel
-              print (model, oldModel)
-              let newHtml = view model
-                  patches = diff oldHtml (Just newHtml)
-              print patches
-              apply loop (updateModel modelV) doc body oldHtml patches
-              loop' modelV model newHtml
-         updateModel modelV f = atomically $ putTMVar modelV f
 
 
-foreign import javascript unsafe "new Event($1, { 'bubbles' : $2, 'cancelable' : $3})"
-        js_newEvent :: JSString -> Bool -> Bool -> IO JSVal
-
-class (IsEvent ev) => MkEvent ev where
-  mkEvent :: ev -> JSVal -> EventObjectOf ev
-
-newEvent :: forall ev. (IsEvent ev, MkEvent ev) => ev -> Bool -> Bool -> IO (EventObjectOf ev)
-newEvent ev bubbles cancelable =
-  do let evStr = eventToJSString ev
-     jsval <- js_newEvent evStr bubbles cancelable
-     pure $ mkEvent ev jsval
 
 {-
 data FancyInputEvent

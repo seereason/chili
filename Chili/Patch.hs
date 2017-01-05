@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# language RankNTypes #-}
 {- Apply some patches -}
-module Patch where
+module Chili.Patch where
 
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans (MonadIO(..))
@@ -9,8 +9,8 @@ import Data.List (sort)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (unpack)
-import Diff (Patch(..))
-import Types (Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, childNodes, item, getFirstChild, getLength, renderHtml, replaceData, setAttribute, unJSNode, setValue, parentNode, removeChild, replaceChild, appendChild, descendants)
+import Chili.Diff (Patch(..))
+import Chili.Types (Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, childNodes, item, getFirstChild, getLength, renderHtml, replaceData, setAttribute, unJSNode, setValue, parentNode, removeChild, replaceChild, appendChild, descendants)
 
 -- data GetNodeState
 {-

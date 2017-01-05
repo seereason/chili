@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-module Diff where
+module Chili.Diff where
 
 import Control.Monad.State (State(..), evalState, get, put)
 import Data.Map (Map)
@@ -7,7 +7,7 @@ import qualified Data.Map as Map
 import Data.Monoid ((<>))
 import Data.Text (Text, pack)
 import qualified Data.Text as Text
-import Types (Html(..), Attr(..), descendants, flattenCData)
+import Chili.Types (Html(..), Attr(..), descendants, flattenCData)
 
 data Patch model
     = Remove
