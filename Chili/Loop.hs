@@ -1,3 +1,4 @@
+{-# language ScopedTypeVariables #-}
 module Chili.Loop where
 
 import Control.Concurrent.STM (atomically)
@@ -6,7 +7,7 @@ import Chili.Diff
 import Chili.Patch
 import Chili.Types
 
-loop :: (Show model) => JSDocument
+loop :: JSDocument
      -> JSNode
      -> model
      -> (model -> Html model)
@@ -25,10 +26,11 @@ loop doc body initModel view =
            do putStrLn "loop'"
               f <- atomically $ takeTMVar modelV
               model <- f oldModel
-              print (model, oldModel)
+--              print (model, oldModel)
               let newHtml = view model
                   patches = diff oldHtml (Just newHtml)
               print patches
               apply loop (updateModel modelV) doc body oldHtml patches
               loop' modelV model newHtml
+--         updateModel :: TMVar model -> (model -> IO model) -> IO ()
          updateModel modelV f = atomically $ putTMVar modelV f

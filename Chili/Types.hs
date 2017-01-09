@@ -1318,7 +1318,7 @@ renderHtml loop withModel doc (Element tag attrs children) =
       doAttr elem (Attr k v)   = setAttribute elem k v
       doAttr elem (EL eventType eventHandler) = do
         liftIO $ putStrLn $ "Adding event listener for " ++ show eventType
-        addEventListener elem eventType (\e -> withModel (eventHandler e)) False
+        addEventListener elem eventType (\e -> putStrLn "eventHandler start" >> withModel (eventHandler e) >> putStrLn "eventHandler end") False
 
 renderHtml loop withModel doc (Cntl (Control cmodel cview) eventType eventHandler) =
   do (Just cBody) <- fmap toJSNode <$> createJSElement doc (Text.pack "span")
