@@ -10,9 +10,10 @@ import Control.Lens ((^.))
 import Control.Lens.TH (makeLenses)
 import Control.Monad (when)
 import Control.Monad.Trans (MonadIO(..))
-import Data.Maybe (fromJust)
+import Data.Aeson (FromJSON, ToJSON, decodeStrict, encode)
+import qualified Data.ByteString.Lazy.Char8 as C
 import Data.Aeson.Types (Parser, Result(..), parse)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromJust, fromMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.JSString as JS
@@ -27,6 +28,10 @@ import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
 import GHCJS.Marshal.Pure (PToJSVal(pToJSVal), PFromJSVal(pFromJSVal))
 import GHCJS.Nullable (Nullable(..), nullableToMaybe, maybeToNullable)
 import GHCJS.Types (JSVal(..), JSString(..),  nullRef, isNull, isUndefined)
+import JavaScript.Web.MessageEvent (MessageEvent(..), MessageEventData(..))
+import qualified JavaScript.Web.MessageEvent as MessageEvent
+import qualified JavaScript.Web.WebSocket as WebSockets
+import JavaScript.Web.WebSocket (WebSocket, WebSocketRequest(..), connect, send)
 
 instance Eq JSVal where
   a == b = js_eq a b
@@ -1198,6 +1203,27 @@ getStatusText self
 foreign import javascript unsafe "$1[\"responseURL\"]"
         js_getResponseURL :: XMLHttpRequest -> IO JSString
 
+
+-- * WebSocket
+
+sendRemoteWS :: (ToJSON remote) => WebSocket -> remote -> IO ()
+sendRemoteWS ws remote =
+  do let jstr = JS.pack (C.unpack $ encode remote)
+     putStrLn $ "send WS: " ++ JS.unpack jstr
+     WebSockets.send jstr ws
+     putStrLn $ "sent."
+
+initRemoteWS :: (ToJSON remote) => JS.JSString -> (MessageEvent -> IO ()) -> IO (remote -> IO ())
+initRemoteWS url' onMessageHandler =
+  do let request = WebSocketRequest { url       = url'
+                                    , protocols = []
+                                    , onClose   = Nothing
+                                    , onMessage = Just onMessageHandler
+---                                    , onMessage = Just (incomingWS decodeAction queue)
+                                    }
+     ws <- WebSockets.connect request
+     pure (sendRemoteWS ws)
+
 -- * Selection
 
 newtype Selection = Selection { unSelection ::  JSVal }
@@ -1283,6 +1309,7 @@ instance Show (Html model) where
 
 data Control event = forall model. (Show model) => Control
   { cmodel  :: model
+  , cinit   :: model -> IO model
   , cview   :: model -> Html model
   }
 
@@ -1302,7 +1329,9 @@ flattenCData (CData a : CData b : rest) = flattenCData (CData (a <> b) : rest)
 flattenCData (h : t) = h : flattenCData t
 flattenCData [] = []
 
-type Loop = forall model. (Show model) => JSDocument -> JSNode -> model -> (model -> Html model) -> IO ()
+type Loop = forall model remote. (Show model, ToJSON remote) =>
+            JSDocument -> JSNode -> model -> ((remote -> IO ()) -> model -> IO model) ->
+            JS.JSString -> (MessageEvent -> model -> IO model) -> ((remote -> IO ()) -> model -> Html model) -> IO ()
 
 renderHtml :: (MonadIO m) => Loop -> ((model -> IO model) -> IO ()) -> JSDocument -> Html model -> m (Maybe JSNode)
 renderHtml _ _ doc (CData t) = fmap (fmap toJSNode) $ createJSTextNode doc t
@@ -1319,13 +1348,13 @@ renderHtml loop withModel doc (Element tag attrs children) =
       doAttr elem (EL eventType eventHandler) = do
         liftIO $ putStrLn $ "Adding event listener for " ++ show eventType
         addEventListener elem eventType (\e -> putStrLn "eventHandler start" >> withModel (eventHandler e) >> putStrLn "eventHandler end") False
-
-renderHtml loop withModel doc (Cntl (Control cmodel cview) eventType eventHandler) =
+{-
+renderHtml loop withModel doc (Cntl (Control cmodel cinit cview) eventType eventHandler) =
   do (Just cBody) <- fmap toJSNode <$> createJSElement doc (Text.pack "span")
-     tid <- liftIO $ forkIO $ loop doc cBody cmodel cview
+     tid <- liftIO $ forkIO $ loop doc cBody cmodel cinit cview
      addEventListener cBody eventType (\e -> withModel (eventHandler e)) False
      pure (Just cBody)
-
+-}
 {-
 renderHtml loop withModel doc (Cntl (Control cmodel cview) eventType eventHandler) =
   do (Just cBody) <- fmap toJSNode <$> createJSElement doc (Text.pack "div")

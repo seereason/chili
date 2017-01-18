@@ -14,6 +14,7 @@ cabal-version:       >=1.10
 library
   build-depends:       aeson,
                        base >=4.8 && <4.9,
+                       bytestring,
                        containers,
                        hsx2hs,
                        ghcjs-base,

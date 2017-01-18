@@ -4,7 +4,7 @@ let
 
   inherit (nixpkgs) pkgs;
 
-  f = { mkDerivation, aeson, base, containers, ghcjs-base, lens, machines, mtl
+  f = { mkDerivation, aeson, base, bytestring, containers, ghcjs-base, lens, machines, mtl
       , stdenv, text, hsx2hs, stm
       }:
       mkDerivation {
@@ -14,7 +14,7 @@ let
         isLibrary = false;
         isExecutable = true;
         executableHaskellDepends = [
-          aeson base containers ghcjs-base lens machines mtl text hsx2hs stm
+          aeson base bytestring containers ghcjs-base lens machines mtl text hsx2hs stm
         ];
         buildTools = [ pkgs.haskellPackages.ghc pkgs.haskellPackages.cabal-install ];
         description = "yet another clientside ui library";
