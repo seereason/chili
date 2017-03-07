@@ -1291,7 +1291,7 @@ getEndOffset r = liftIO (js_getEndOffset r)
 
 data Attr model where
   Attr :: Text -> Text -> Attr model
-  EL :: (Show event, IsEvent event, FromJSVal (EventObjectOf event)) => event -> (EventObjectOf event -> model -> IO model) -> Attr model
+  EL :: (Show event, IsEvent event, FromJSVal (EventObjectOf event)) => event -> (EventObjectOf event -> WithModel model -> IO ()) -> Attr model
 
 instance Show (Attr model) where
   show (Attr a v) = Text.unpack a <> " := " <> Text.unpack v
@@ -1300,7 +1300,7 @@ instance Show (Attr model) where
 data Html model where
   Element :: Text -> [Attr model] -> [Html model] -> Html model
   CData :: Text -> Html model
-  Cntl :: (Show event, IsEvent event, FromJSVal (EventObjectOf event)) => Control event -> event -> (EventObjectOf event -> model -> IO model) -> Html model
+  Cntl :: (Show event, IsEvent event, FromJSVal (EventObjectOf event)) => Control event -> event -> (EventObjectOf event -> (model -> IO model) -> IO ()) -> Html model
 
 instance Show (Html model) where
   show (Element n attrs elems) = "Element " <> Text.unpack n <> " " <> show attrs <> " " <> show elems
@@ -1329,11 +1329,13 @@ flattenCData (CData a : CData b : rest) = flattenCData (CData (a <> b) : rest)
 flattenCData (h : t) = h : flattenCData t
 flattenCData [] = []
 
-type Loop = forall model remote. (Show model, ToJSON remote) =>
-            JSDocument -> JSNode -> model -> ((remote -> IO ()) -> model -> IO model) ->
-            JS.JSString -> (MessageEvent -> model -> IO model) -> ((remote -> IO ()) -> model -> Html model) -> IO ()
+type WithModel model = (model -> IO model) -> IO ()
 
-renderHtml :: (MonadIO m) => Loop -> ((model -> IO model) -> IO ()) -> JSDocument -> Html model -> m (Maybe JSNode)
+type Loop = forall model remote. (Show model, ToJSON remote) =>
+            JSDocument -> JSNode -> model -> ((remote -> IO ()) -> WithModel model -> IO ()) ->
+            JS.JSString -> (MessageEvent -> WithModel model -> IO ()) -> ((remote -> IO ()) -> model -> Html model) -> IO ()
+
+renderHtml :: (MonadIO m) => Loop -> WithModel model -> JSDocument -> Html model -> m (Maybe JSNode)
 renderHtml _ _ doc (CData t) = fmap (fmap toJSNode) $ createJSTextNode doc t
 renderHtml loop withModel doc (Element tag attrs children) =
     do me <- createJSElement doc tag
@@ -1347,7 +1349,7 @@ renderHtml loop withModel doc (Element tag attrs children) =
       doAttr elem (Attr k v)   = setAttribute elem k v
       doAttr elem (EL eventType eventHandler) = do
         liftIO $ putStrLn $ "Adding event listener for " ++ show eventType
-        addEventListener elem eventType (\e -> putStrLn "eventHandler start" >> withModel (eventHandler e) >> putStrLn "eventHandler end") False
+        addEventListener elem eventType (\e -> putStrLn "eventHandler start" >> eventHandler e withModel >> putStrLn "eventHandler end") False
 {-
 renderHtml loop withModel doc (Cntl (Control cmodel cinit cview) eventType eventHandler) =
   do (Just cBody) <- fmap toJSNode <$> createJSElement doc (Text.pack "span")

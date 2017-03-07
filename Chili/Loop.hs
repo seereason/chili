@@ -52,21 +52,21 @@ loop :: (ToJSON remote) =>
         JSDocument
      -> JSNode
      -> model
-     -> ((remote -> IO ()) -> model -> IO model)
+     -> ((remote -> IO ()) -> WithModel model -> IO ())
      -> JS.JSString
-     -> (MessageEvent -> model -> IO model)
+     -> (MessageEvent -> WithModel model -> IO ())
      -> ((remote -> IO ()) -> model -> Html model)
      -> IO ()
 loop doc body initModel initAction url handleWS view =
   do putStrLn "loop"
      modelV <- atomically $ newEmptyTMVar -- (initModel, html)
-     rec sendWS <- initRemoteWS url (\me -> updateModel modelV sendWS (handleWS me))
+     rec sendWS <- initRemoteWS url (\me -> handleWS me (updateModel modelV sendWS))
      let html = view sendWS initModel
      atomically $ putTMVar modelV (initModel, html)
      (Just node) <- renderHtml loop (updateModel modelV sendWS) doc html
      removeChildren body
      appendChild body (Just node)
-     updateModel modelV sendWS (initAction sendWS)
+     initAction sendWS (updateModel modelV sendWS)
      pure ()
        where
          updateModel modelV sendWS f =
