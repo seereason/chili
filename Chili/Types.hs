@@ -1329,7 +1329,7 @@ flattenCData (CData a : CData b : rest) = flattenCData (CData (a <> b) : rest)
 flattenCData (h : t) = h : flattenCData t
 flattenCData [] = []
 
-type WithModel model = (model -> IO model) -> IO ()
+type WithModel model = (model -> IO (Maybe model)) -> IO ()
 
 type Loop = forall model remote. (Show model, ToJSON remote) =>
             JSDocument -> JSNode -> model -> ((remote -> IO ()) -> WithModel model -> IO ()) ->

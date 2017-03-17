@@ -46,7 +46,7 @@ walk a mb index =
       (Element tagNameA attrsA childrenA)
         | tagNameA == tagNameB {- && keyA == keyB -} ->
             let propsPatches    = diffAttrs attrsA attrsB index
-                childrenPatches = diffChildren index (flattenCData childrenA) (flattenCData childrenB) index
+                childrenPatches = diffChildren index childrenA childrenB index
             in propsPatches ++ childrenPatches
       _ -> [(index, [VNode b])]
    (Just (CData  txtB)) ->

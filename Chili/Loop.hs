@@ -48,7 +48,7 @@ loop doc body initModel view =
          updateModel modelV f = atomically $ putTMVar modelV f
 -}
 
-loop :: (ToJSON remote) =>
+loop :: forall remote model. (ToJSON remote) =>
         JSDocument
      -> JSNode
      -> model
@@ -69,15 +69,22 @@ loop doc body initModel initAction url handleWS view =
      initAction sendWS (updateModel modelV sendWS)
      pure ()
        where
+         updateModel :: TMVar (model, Html model) -> (remote -> IO ()) ->  (model -> IO (Maybe model)) -> IO ()
          updateModel modelV sendWS f =
-           do (oldModel, oldHtml) <- atomically $ takeTMVar modelV
-              model <- f oldModel
-              let newHtml = view sendWS model
-                  patches = diff oldHtml (Just newHtml)
-              atomically $ putTMVar modelV (model, newHtml)
-              print patches
-              apply loop (updateModel modelV sendWS) doc body oldHtml patches
-              pure ()
+           do old@(oldModel, oldHtml) <- atomically $ takeTMVar modelV
+              mmodel <- f oldModel
+              case mmodel of
+                Nothing -> do -- putStrLn "loop: no change."
+                              atomically $ putTMVar modelV old
+                              pure ()
+                (Just model) ->
+                  do -- putStrLn "loop: changed."
+                     let newHtml = view sendWS model
+                         patches = diff oldHtml (Just newHtml)
+                     atomically $ putTMVar modelV (model, newHtml)
+                     putStrLn $ "patches: " ++ show patches
+                     apply loop (updateModel modelV sendWS) doc body oldHtml patches
+                     pure ()
 {-
          loop' doc body initModel initAction view =
            do loop doc body initModel initAction view

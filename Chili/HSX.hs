@@ -5,7 +5,7 @@ import Data.Monoid ((<>))
 import Data.Text (Text, pack, unpack)
 import GHCJS.Marshal.Pure (pFromJSVal)
 import GHCJS.Types (JSVal(..), JSString(..))
-import Chili.Types (Attr(Attr, EL), Html(Element, CData, Cntl), descendants)
+import Chili.Types (Attr(Attr, EL), Html(Element, CData, Cntl), flattenCData, descendants)
 
 default (Text)
 
@@ -13,7 +13,7 @@ default (Text)
 
 genElement (d, t) a c =
     let c' = (concat c)
-    in Element t a c'
+    in Element t a (flattenCData c')
 
 genEElement (d, t) a = genElement (d, t) a []
 

@@ -10,7 +10,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (unpack)
 import Chili.Diff (Patch(..))
-import Chili.Types (Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, childNodes, item, getFirstChild, getLength, renderHtml, replaceData, setAttribute, unJSNode, setValue, parentNode, removeChild, replaceChild, appendChild, descendants)
+import Chili.Types (Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, WithModel, childNodes, item, getFirstChild, getLength, renderHtml, replaceData, setAttribute, unJSNode, setValue, parentNode, removeChild, replaceChild, appendChild, descendants)
 
 -- data GetNodeState
 {-
@@ -30,7 +30,7 @@ getNodes html nodeIndices =
 -}
 
 apply :: Loop
-      -> ((model -> IO model) -> IO ())
+      -> WithModel model -- ((model -> IO model) -> IO ())
       -> JSDocument
       -> JSNode
       -> Html model
@@ -49,7 +49,7 @@ apply loop withModel document rootNode vdom patches =
                 return rootNode
 
 apply' :: Loop
-       -> ((model -> IO model) -> IO ())
+       -> WithModel model -- ((model -> IO model) -> IO ())
        -> JSDocument
        -> Map Int [Patch model]
        -> (Int, JSNode)
@@ -62,7 +62,7 @@ apply' loop withModel document patchMap (index, node) = do
       Nothing -> error $ "Y NO PATCH? " ++ show index
 
 apply'' :: Loop
-        -> ((model -> IO model) -> IO ())
+        -> WithModel model -- ((model -> IO model) -> IO ())
         -> JSDocument
         -> JSNode
         -> Patch model
