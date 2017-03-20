@@ -6,6 +6,7 @@ module Chili.Types where
 import Control.Applicative (Applicative, Alternative)
 import Control.Concurrent (forkIO)
 import Control.Monad (Monad, MonadPlus)
+import Control.Monad.Fix (mfix)
 import Control.Lens ((^.))
 import Control.Lens.TH (makeLenses)
 import Control.Monad (when)
@@ -1215,14 +1216,13 @@ sendRemoteWS ws remote =
 
 initRemoteWS :: (ToJSON remote) => JS.JSString -> (MessageEvent -> IO ()) -> IO (remote -> IO ())
 initRemoteWS url' onMessageHandler =
-  do let request = WebSocketRequest { url       = url'
-                                    , protocols = []
-                                    , onClose   = Nothing
-                                    , onMessage = Just onMessageHandler
----                                    , onMessage = Just (incomingWS decodeAction queue)
-                                    }
-     ws <- WebSockets.connect request
-     pure (sendRemoteWS ws)
+    do let request = WebSocketRequest { url       = url'
+                                      , protocols = []
+                                      , onClose   = Nothing
+                                      , onMessage = Just onMessageHandler
+                                      }
+       ws <- WebSockets.connect request
+       pure (sendRemoteWS ws)
 
 -- * Selection
 
@@ -1333,7 +1333,7 @@ type WithModel model = (model -> IO (Maybe model)) -> IO ()
 
 type Loop = forall model remote. (Show model, ToJSON remote) =>
             JSDocument -> JSNode -> model -> ((remote -> IO ()) -> WithModel model -> IO ()) ->
-            JS.JSString -> (MessageEvent -> WithModel model -> IO ()) -> ((remote -> IO ()) -> model -> Html model) -> IO ()
+            JS.JSString -> ((remote -> IO ()) -> MessageEvent -> WithModel model -> IO ()) -> ((remote -> IO ()) -> model -> Html model) -> IO ()
 
 renderHtml :: (MonadIO m) => Loop -> WithModel model -> JSDocument -> Html model -> m (Maybe JSNode)
 renderHtml _ _ doc (CData t) = fmap (fmap toJSNode) $ createJSTextNode doc t
