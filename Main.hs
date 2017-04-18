@@ -16,7 +16,7 @@ import qualified Data.Text as T
 import qualified Data.JSString as JS
 import Data.JSString.Text (textToJSString, textFromJSString)
 import Chili.Loop (loop)
-import Chili.Types (Attr(..), Control(..), EventTarget(..), EventObject(..), Event(..), IsEventTarget(..), IsEventObject(..), IsEvent(..), EventObjectOf(..), Html(..), JSDocument, JSNode, MouseEvent(..), MouseEventObject(..), MkEvent(..), js_alert, addEventListener, appendChild, currentDocument, currentTarget, createJSElement, createJSTextNode, dispatchEvent, getElementsByTagName, item, parentNode, removeChildren, setAttribute, toJSNode, maybeJSNullOrUndefined, newEvent, unJSNode, target, renderHtml, stopPropagation)
+import Chili.Types (Attr(..), Control(..), EventTarget(..), EventObject(..), Event(..), IsEventTarget(..), IsEventObject(..), IsEvent(..), EventObjectOf(..), Html(..), JSDocument, JSNode, MouseEvent(..), MouseEventObject(..), MkEvent(..), js_alert, addEventListener, appendChild, currentDocument, currentTarget, createJSElement, createJSTextNode, dispatchEvent, getElementsByTagName, item, parentNode, removeChildren, setAttribute, toJSNode, maybeJSNullOrUndefined, newEvent, unJSNode, target, renderHtml, stopPropagation, js_alert, focus)
 import GHCJS.Foreign (jsNull)
 import GHCJS.Types (JSVal(..), JSString(..))
 import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
@@ -60,6 +60,7 @@ type instance EventObjectOf MyButtonEvent   = MyButtonEventObject
 -- Note that is uses the model/view pattern
 --
 -- This button displays how many times it has been clicked
+{-
 myButton :: Text -> Control MyButtonEvent
 myButton msg =
   Control { cmodel = 0
@@ -73,21 +74,22 @@ myButton msg =
       toggleEventObject <- newEvent Flicked True True
       dispatchEvent (target e) toggleEventObject
       pure (succ m)
-
+-}
 -- | an app which uses `myButton`
 --
 -- We have two buttons, which increment the global counter.
 -- One regular button and one myButton.
 --
 -- We do not show the `myButton` until the global counter is >= 2
-app :: Int -> Html Int
-app model =
+app :: (() -> IO ()) -> Int -> Html Int
+app _ model =
   Element "div" []
    ([ Element "p" [] [ CData $ T.pack $ "# clicks: " ++ show model]
-   , Element "button" [EL Click (\e m -> pure (succ m))] [CData "click me!"]
-   ] ++ (if (model >= 2)
+    , Element "button" [EL Click (\e wm -> wm (\m -> pure (Just $ succ m)))] [CData "click me!"]
+    , Element "textarea" [OnCreate (\el wm -> focus el) ] []
+   ] {- ++ (if (model >= 2)
          then [Cntl (myButton "flick me") Flicked (\_ m -> pure $ succ m)]
-         else []))
+         else [])-} )
 
 -- | a pretty standard main function
 main :: IO ()
@@ -95,7 +97,7 @@ main =
   do (Just doc)   <- currentDocument
      (Just nodes) <- getElementsByTagName doc "body"
      (Just body)  <- item nodes 0
-     loop doc body 0 app
+     loop doc body 0 (\_ _ -> pure ()) Nothing (\_ _ _ -> pure ()) app
 
 
 

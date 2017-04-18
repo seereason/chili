@@ -16,6 +16,7 @@ import qualified Data.ByteString.Lazy.Char8 as C
 import Data.Aeson.Types (Parser, Result(..), parse)
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Monoid ((<>))
+import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.JSString as JS
 import Data.JSString.Text (textToJSString, textFromJSString)
@@ -24,7 +25,7 @@ import qualified Data.Text as Text
 -- import JavaScript.TypedArray.ArrayBuffer (ArrayBuffer)
 import GHCJS.Buffer
 import GHCJS.Foreign (jsNull)
-import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback1, syncCallback1)
+import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
 import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
 import GHCJS.Marshal.Pure (PToJSVal(pToJSVal), PFromJSVal(pFromJSVal))
 import GHCJS.Nullable (Nullable(..), nullableToMaybe, maybeToNullable)
@@ -1303,11 +1304,13 @@ getEndOffset r = liftIO (js_getEndOffset r)
 data Attr model where
   Attr :: Text -> Text -> Attr model
   Prop :: Text -> Text -> Attr model
+  OnCreate :: (JSElement -> WithModel model -> IO ()) -> Attr model
   EL :: (Show event, IsEvent event, FromJSVal (EventObjectOf event)) => event -> (EventObjectOf event -> WithModel model -> IO ()) -> Attr model
 
 instance Show (Attr model) where
   show (Attr a v) = Text.unpack a <> " := " <> Text.unpack v
   show (Prop a v) = "." <> Text.unpack a <> " = " <> Text.unpack v
+  show (OnCreate _ ) = "onCreate"
   show (EL e _) = "on" ++ show e
 
 data Html model where
@@ -1336,7 +1339,7 @@ instance IsEventTarget JSNode where
 -- I believe that if we try to `appendChild` several `CData` nodes
 -- that the browser will consolidate them into a single node. That
 -- throws off our mapping between the VDOM and the DOM. So, we need to
--- do the same 
+-- do the same
 flattenCData :: [Html model] -> [Html model]
 flattenCData (CData a : CData b : rest) = flattenCData (CData (a <> b) : rest)
 flattenCData (h : t) = h : flattenCData t
@@ -1346,7 +1349,7 @@ type WithModel model = (model -> IO (Maybe model)) -> IO ()
 
 type Loop = forall model remote. (Show model, ToJSON remote) =>
             JSDocument -> JSNode -> model -> ((remote -> IO ()) -> WithModel model -> IO ()) ->
-            JS.JSString -> ((remote -> IO ()) -> MessageEvent -> WithModel model -> IO ()) -> ((remote -> IO ()) -> model -> Html model) -> IO ()
+            Maybe JS.JSString -> ((remote -> IO ()) -> MessageEvent -> WithModel model -> IO ()) -> ((remote -> IO ()) -> model -> Html model) -> IO ()
 
 renderHtml :: (MonadIO m) => Loop -> WithModel model -> JSDocument -> Html model -> m (Maybe JSNode)
 renderHtml _ _ doc (CData t) = fmap (fmap toJSNode) $ createJSTextNode doc t
@@ -1361,9 +1364,15 @@ renderHtml loop withModel doc (Element tag attrs children) =
     where
       doAttr elem (Attr k v)   = setAttribute elem k v
       doAttr elem (Prop k v)   = setProperty elem k v
+      doAttr elem (OnCreate f) = liftIO $ do cb <- asyncCallback $ f elem withModel
+                                             js_setTimeout cb 0
       doAttr elem (EL eventType eventHandler) = do
         liftIO $ putStrLn $ "Adding event listener for " ++ show eventType
         addEventListener elem eventType (\e -> putStrLn "eventHandler start" >> eventHandler e withModel >> putStrLn "eventHandler end") False
+
+foreign import javascript unsafe "window[\"setTimeout\"]($1, $2)" js_setTimeout ::
+  Callback (IO ()) -> Int -> IO ()
+
 {-
 renderHtml loop withModel doc (Cntl (Control cmodel cinit cview) eventType eventHandler) =
   do (Just cBody) <- fmap toJSNode <$> createJSElement doc (Text.pack "span")
