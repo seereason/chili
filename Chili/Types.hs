@@ -436,6 +436,17 @@ getAttribute self name = liftIO (js_getAttribute self name >>= fromJSVal)
 foreign import javascript unsafe "$1[\"style\"][$2] = $3"
         setStyle :: JSElement -> JSString -> JSString -> IO ()
 
+foreign import javascript unsafe "$1[$2] = $3"
+        js_setProperty :: JSElement -> JSString -> JSString -> IO ()
+
+-- | <https://developer.mozilla.org/en-US/docs/Web/API/Element.setAttribute Mozilla Element.setAttribute documentation>
+setProperty ::
+             (MonadIO m) =>
+               JSElement -> Text -> Text -> m ()
+setProperty self name value
+  = liftIO
+      (js_setProperty self (textToJSString name) (textToJSString value))
+
 {-
 setCSS :: (MonadIO m) =>
           JSElement
@@ -1291,10 +1302,12 @@ getEndOffset r = liftIO (js_getEndOffset r)
 
 data Attr model where
   Attr :: Text -> Text -> Attr model
+  Prop :: Text -> Text -> Attr model
   EL :: (Show event, IsEvent event, FromJSVal (EventObjectOf event)) => event -> (EventObjectOf event -> WithModel model -> IO ()) -> Attr model
 
 instance Show (Attr model) where
   show (Attr a v) = Text.unpack a <> " := " <> Text.unpack v
+  show (Prop a v) = "." <> Text.unpack a <> " = " <> Text.unpack v
   show (EL e _) = "on" ++ show e
 
 data Html model where
@@ -1347,6 +1360,7 @@ renderHtml loop withModel doc (Element tag attrs children) =
                 return (Just $ toJSNode e)
     where
       doAttr elem (Attr k v)   = setAttribute elem k v
+      doAttr elem (Prop k v)   = setProperty elem k v
       doAttr elem (EL eventType eventHandler) = do
         liftIO $ putStrLn $ "Adding event listener for " ++ show eventType
         addEventListener elem eventType (\e -> putStrLn "eventHandler start" >> eventHandler e withModel >> putStrLn "eventHandler end") False

@@ -27,16 +27,27 @@ instance Show (Patch model) where
 diff :: forall model. Html model -> Maybe (Html model) -> Map Int [Patch model]
 diff a b = Map.fromListWith (flip (++)) (walk a b 0)
 
--- FIXME: does not handle changes to Events
+-- FIXME: does not handle changes to Events or Properties
 -- FIXME: we should be able to add and remove single attributes
 diffAttrs :: [Attr model] -> [Attr model] -> Int -> [(Int, [Patch model])]
 diffAttrs attrsA attrsB index =
           let attrsA' = [(k,v) | Attr k v <- attrsA]
               attrsB' = [(k,v) | Attr k v <- attrsB]
+              propsA' = [(k,v) | Prop k v <- attrsA]
+              propsB' = [(k,v) | Prop k v <- attrsB]
+          in if (attrsA' == attrsB') && (propsA' == propsB')
+             then []
+             else [(index, [Props attrsB])]
+--  where
+--    isAttrProp (Attr k v) = (k, v)
+
+{-
+          let attrsA' = [(k,v) | Attr k v <- attrsA]
+              attrsB' = [(k,v) | Attr k v <- attrsB]
           in if attrsA' == attrsB'
              then []
              else [(index, [Props attrsB])]
-
+-}
 walk :: Html model -> Maybe (Html model) -> Int -> [(Int, [Patch model])]
 walk a mb index =
   case mb of

@@ -10,7 +10,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (unpack)
 import Chili.Diff (Patch(..))
-import Chili.Types (Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, WithModel, childNodes, item, getFirstChild, getLength, renderHtml, replaceData, setAttribute, unJSNode, setValue, parentNode, removeChild, replaceChild, appendChild, descendants)
+import Chili.Types (Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, WithModel, childNodes, item, getFirstChild, getLength, renderHtml, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, appendChild, descendants)
 
 -- data GetNodeState
 {-
@@ -79,6 +79,10 @@ apply'' loop withModel document node patch =
                         case (unpack k) of
 --                          "value" -> setValue e v -- FIXME: this causes issues with the cursor position
                           _ -> setAttribute e k v) [ (k,v) | Attr k v <- newProps ]
+             mapM_ (\(k, v) ->
+                        case (unpack k) of
+--                          "value" -> setValue e v -- FIXME: this causes issues with the cursor position
+                          _ -> setProperty e k v) [ (k,v) | Prop k v <- newProps ]
       (Insert elem) ->
           -- FIXME: don't get parent?
           do mparent <- parentNode node
