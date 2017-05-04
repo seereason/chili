@@ -569,13 +569,13 @@ instance IsEvent MouseEvent where
   eventToJSString Click       = JS.pack "click"
   eventToJSString ContextMenu = JS.pack "contextmenu"
   eventToJSString DblClick    = JS.pack "dblclick"
-  eventToJSString MouseDown   = JS.pack "MouseDown"
-  eventToJSString MouseEnter  = JS.pack "MouseEnter"
-  eventToJSString MouseLeave  = JS.pack "MouseLeave"
-  eventToJSString MouseMove   = JS.pack "MouseMove"
-  eventToJSString MouseOver   = JS.pack "MouseOver"
-  eventToJSString MouseOut    = JS.pack "MouseOut"
-  eventToJSString MouseUp     = JS.pack "MouseUp"
+  eventToJSString MouseDown   = JS.pack "mousedown"
+  eventToJSString MouseEnter  = JS.pack "mouseenter"
+  eventToJSString MouseLeave  = JS.pack "mouseleave"
+  eventToJSString MouseMove   = JS.pack "mousemove"
+  eventToJSString MouseOver   = JS.pack "mouseover"
+  eventToJSString MouseOut    = JS.pack "mouseout"
+  eventToJSString MouseUp     = JS.pack "mouseup"
 
 data KeyboardEvent
   = KeyDown
@@ -720,6 +720,15 @@ data TouchEvent
   | TouchStart
   deriving (Eq, Ord, Show, Read)
 
+data SelectionEvent
+  = SelectionStart
+  | SelectionChange
+  deriving (Eq, Ord, Show, Read)
+
+instance IsEvent SelectionEvent where
+  eventToJSString SelectionStart  = JS.pack "selectionstart"
+  eventToJSString SelectionChange = JS.pack "selectionchange"
+
 -- https://developer.mozilla.org/en-US/docs/Web/API/ProgressEvent
 -- data ProgressEvent =
 
@@ -737,6 +746,7 @@ data EventType
   | ServerSentEvent ServerSentEvent
   | MiscEvent MiscEvent
   | TouchEvent TouchEvent
+  | SelectionEvent SelectionEvent
   deriving (Eq, Ord, Show, Read)
 
 -- * Event Objects
@@ -871,6 +881,7 @@ type instance EventObjectOf KeyboardEvent  = KeyboardEventObject
 type instance EventObjectOf FormEvent      = EventObject
 type instance EventObjectOf ProgressEvent  = ProgressEventObject
 type instance EventObjectOf ClipboardEvent = ClipboardEventObject
+type instance EventObjectOf SelectionEvent = SelectionEventObject
 
 -- * DOMRect
 
@@ -1236,6 +1247,24 @@ initRemoteWS url' onMessageHandler =
        ws <- WebSockets.connect request
        pure (sendRemoteWS ws)
 
+-- * SelectionEventObject
+
+newtype SelectionEventObject = SelectionEventObject { unSelectionEventObject :: JSVal }
+
+instance Show SelectionEventObject where
+  show _ = "SelectionEventObject"
+
+instance ToJSVal SelectionEventObject where
+  toJSVal = return . unSelectionEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal SelectionEventObject where
+  fromJSVal = return . fmap SelectionEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject SelectionEventObject where
+  asEventObject (SelectionEventObject jsval) = EventObject jsval
+
 -- * Selection
 
 newtype Selection = Selection { unSelection ::  JSVal }
@@ -1248,11 +1277,7 @@ instance FromJSVal Selection where
   fromJSVal = pure . fmap Selection . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
-foreign import javascript unsafe "$1[\"getRangeAt\"]($2)"
-        js_getRangeAt :: Selection -> Int -> IO Range
-
-getRangeAt :: (MonadIO m) => Selection -> Int -> m Range
-getRangeAt selection index = liftIO (js_getRangeAt selection index)
+-- ** Properties
 
 foreign import javascript unsafe "$1[\"rangeCount\"]"
         js_getRangeCount :: Selection -> IO Int
@@ -1260,8 +1285,19 @@ foreign import javascript unsafe "$1[\"rangeCount\"]"
 getRangeCount :: (MonadIO m) => Selection -> m Int
 getRangeCount selection = liftIO (js_getRangeCount selection)
 
+
+-- ** methods
+
+foreign import javascript unsafe "$1[\"getRangeAt\"]($2)"
+        js_getRangeAt :: Selection -> Int -> IO Range
+
+getRangeAt :: (MonadIO m) => Selection -> Int -> m Range
+getRangeAt selection index = liftIO (js_getRangeAt selection index)
+
+
 foreign import javascript unsafe "$1[\"toString\"]()"
  selectionToString :: Selection -> IO JSString
+
 
 -- * Range
 
@@ -1276,28 +1312,95 @@ instance FromJSVal Range where
   {-# INLINE fromJSVal #-}
 
 foreign import javascript unsafe "$1[\"startContainer\"]"
-        js_getStartContainer :: Range -> IO JSNode
+        js_startContainer :: Range -> IO JSNode
+{-
+foreign import javascript unsafe "$[\"createRange\"]()"
+  js_createRange :: JSDocument -> IO Range
 
-getStartContainer :: (MonadIO m) => Range -> m JSNode
-getStartContainer r = liftIO (js_getStartContainer r)
+createRange :: JSDocument -> IO Range
+createRange d = js_createRange d
+-}
+foreign import javascript unsafe "$1[\"selectNode\"]($2)"
+  js_selectNode :: Range -> JSNode -> IO ()
+
+foreign import javascript unsafe "$1[\"toString\"]()"
+  js_rangeToString :: Range -> IO JSString
+
+selectNode :: Range -> JSNode -> IO ()
+selectNode r n = js_selectNode r n
+
+startContainer :: (MonadIO m) => Range -> m JSNode
+startContainer r = liftIO (js_startContainer r)
 
 foreign import javascript unsafe "$1[\"startOffset\"]"
-        js_getStartOffset :: Range -> IO Int
+        js_startOffset :: Range -> IO Int
 
-getStartOffset :: (MonadIO m) => Range -> m Int
-getStartOffset r = liftIO (js_getStartOffset r)
+startOffset :: (MonadIO m) => Range -> m Int
+startOffset r = liftIO (js_startOffset r)
 
 foreign import javascript unsafe "$1[\"endContainer\"]"
-        js_getEndContainer :: Range -> IO JSNode
+        js_endContainer :: Range -> IO JSNode
 
-getEndContainer :: (MonadIO m) => Range -> m JSNode
-getEndContainer r = liftIO (js_getEndContainer r)
+endContainer :: (MonadIO m) => Range -> m JSNode
+endContainer r = liftIO (js_endContainer r)
 
 foreign import javascript unsafe "$1[\"endOffset\"]"
-        js_getEndOffset :: Range -> IO Int
+        js_endOffset :: Range -> IO Int
 
-getEndOffset :: (MonadIO m) => Range -> m Int
-getEndOffset r = liftIO (js_getEndOffset r)
+endOffset :: (MonadIO m) => Range -> m Int
+endOffset r = liftIO (js_endOffset r)
+
+newtype ClientRects = ClientRects { unClientRects :: JSVal }
+
+instance ToJSVal ClientRects where
+  toJSVal = return . unClientRects
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal ClientRects where
+  fromJSVal = return . fmap ClientRects . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+foreign import javascript unsafe "$1[\"getClientRects\"]"
+  js_getClientRects :: Range -> IO ClientRects
+
+getClientRects :: (MonadIO m) => Range -> m ClientRects
+getClientRects r = liftIO $ js_getClientRects r
+
+newtype ClientRect = ClientRect { unClientRect :: JSVal }
+
+instance ToJSVal ClientRect where
+  toJSVal = return . unClientRect
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal ClientRect where
+  fromJSVal = return . fmap ClientRect . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+foreign import javascript unsafe "$1[$2]"
+ js_clientRectIx :: ClientRects -> Int -> IO ClientRect
+
+clientRectIx :: (MonadIO m) => ClientRects -> Int -> m ClientRect
+clientRectIx crs i = liftIO $ js_clientRectIx crs i
+
+foreign import javascript unsafe "$1[\"length\"]"
+  clientRectsLength :: ClientRects -> Int
+
+foreign import javascript unsafe "$1[\"left\"]"
+  crLeft :: ClientRect -> Int
+
+-- crLeft :: (MonadIO m) => ClientRect -> m Int
+-- crLeft cr = liftIO $ js_crLeft cr
+
+foreign import javascript unsafe "$1[\"top\"]"
+  crTop :: ClientRect -> Int
+{-
+crTop :: (MonadIO m) => ClientRect -> m Int
+crTop cr = liftIO $ js_crTop cr
+-}
+
+-- Note: probably returns ClientRectList -- similar to NodeList
+-- foreign import javascript unsfae "$1[\"getClientRects\"]()"
+--  js_getClientRects :: Range -> IO JSVal
 
 -- * Pure HTML
 
