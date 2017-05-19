@@ -127,6 +127,39 @@ parentNode :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
 parentNode self =
     liftIO (fromJSVal =<< js_parentNode (toJSNode self))
 
+-- * nodeType
+
+foreign import javascript unsafe "$1[\"nodeType\"]"
+  js_nodeType :: JSNode -> IO Int
+
+nodeType :: (MonadIO m, IsJSNode self) => self -> m Int
+nodeType self = liftIO (js_nodeType $ toJSNode self)
+
+nodeTypeString :: Int -> String
+nodeTypeString n =
+  case n of
+    1 -> "Element"
+    2 -> "Attr"
+    3 -> "Text"
+    4 -> "CDATASection"
+    5 -> "EntityReference"
+    6 -> "Entity"
+    7 -> "ProcessingInstruction"
+    8 -> "Comment"
+    9 -> "Document"
+    10 -> "DocumentType"
+    11 -> "DocumentFragment"
+    12 -> "Notation"
+    _  -> "NodeType=" ++ show n
+
+-- * nodeName
+
+foreign import javascript unsafe "$1[\"nodeName\"]"
+  js_nodeName :: JSNode -> IO JSString
+
+nodeName :: (MonadIO m, IsJSNode self) => self -> m JSString
+nodeName self = liftIO (js_nodeName $ toJSNode self)
+
 -- * JSDocument
 
 newtype JSDocument = JSDocument JSVal
@@ -519,6 +552,12 @@ createJSTextNode document data'
       ((js_createTextNode document
           (textToJSString data'))
          >>= return . Just)
+
+foreign import javascript unsafe "$1[\"nodeValue\"]"
+  js_nodeValue :: JSNode -> IO JSString
+
+nodeValue :: (MonadIO m) => JSNode -> m JSString
+nodeValue node = liftIO $ js_nodeValue node
 
 -- * Events
 
@@ -1288,12 +1327,23 @@ getRangeCount selection = liftIO (js_getRangeCount selection)
 
 -- ** methods
 
+foreign import javascript unsafe "$1[\"addRange\"]($2)"
+  js_addRange :: Selection -> Range -> IO ()
+
+addRange :: (MonadIO m) => Selection -> Range -> m ()
+addRange selection range = liftIO $ (js_addRange selection range)
+
 foreign import javascript unsafe "$1[\"getRangeAt\"]($2)"
         js_getRangeAt :: Selection -> Int -> IO Range
 
 getRangeAt :: (MonadIO m) => Selection -> Int -> m Range
 getRangeAt selection index = liftIO (js_getRangeAt selection index)
 
+foreign import javascript unsafe "$1[\"removeAllRanges\"]()"
+  js_removeAllRanges :: Selection -> IO ()
+
+removeAllRanges :: (MonadIO m) => Selection -> m ()
+removeAllRanges s = liftIO $ js_removeAllRanges s
 
 foreign import javascript unsafe "$1[\"toString\"]()"
  selectionToString :: Selection -> IO JSString
@@ -1310,6 +1360,12 @@ instance ToJSVal Range where
 instance FromJSVal Range where
   fromJSVal = pure . fmap Range . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
+
+foreign import javascript unsafe "new Range()"
+  js_newRange :: IO Range
+
+newRange :: (MonadIO m) => m Range
+newRange = liftIO js_newRange
 
 foreign import javascript unsafe "$1[\"startContainer\"]"
         js_startContainer :: Range -> IO JSNode
@@ -1349,6 +1405,18 @@ foreign import javascript unsafe "$1[\"endOffset\"]"
 
 endOffset :: (MonadIO m) => Range -> m Int
 endOffset r = liftIO (js_endOffset r)
+
+foreign import javascript unsafe "$1[\"setStart\"]($2,$3)"
+  js_setStart :: Range -> JSNode -> Int -> IO ()
+
+setStart :: (MonadIO m) => Range -> JSNode -> Int -> m ()
+setStart r n i = liftIO $ js_setStart r n i
+
+foreign import javascript unsafe "$1[\"setEnd\"]($2,$3)"
+  js_setEnd :: Range -> JSNode -> Int -> IO ()
+
+setEnd :: (MonadIO m) => Range -> JSNode -> Int -> m ()
+setEnd r n i = liftIO $ js_setEnd r n i
 
 newtype ClientRects = ClientRects { unClientRects :: JSVal }
 
@@ -1471,7 +1539,7 @@ renderHtml loop withModel doc (Element tag attrs children) =
                                              js_setTimeout cb 0
       doAttr elem (EL eventType eventHandler) = do
         liftIO $ putStrLn $ "Adding event listener for " ++ show eventType
-        addEventListener elem eventType (\e -> putStrLn "eventHandler start" >> eventHandler e withModel >> putStrLn "eventHandler end") False
+        addEventListener elem eventType (\e -> {- putStrLn "eventHandler start" >> -} eventHandler e withModel {- >> putStrLn "eventHandler end"-}) False
 
 foreign import javascript unsafe "window[\"setTimeout\"]($1, $2)" js_setTimeout ::
   Callback (IO ()) -> Int -> IO ()
