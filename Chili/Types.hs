@@ -289,6 +289,12 @@ foreign import javascript unsafe "$1[\"innerHTML\"] = $2"
 setInnerHTML :: (MonadIO m) => JSElement -> JSString -> m ()
 setInnerHTML elm content = liftIO $ js_setInnerHTML elm content
 
+foreign import javascript unsafe "$1[\"innerHTML\"]"
+        js_getInnerHTML :: JSElement -> IO JSString
+
+getInnerHTML :: (MonadIO m) => JSElement -> m JSString
+getInnerHTML element = liftIO $ js_getInnerHTML element
+
 -- * childNodes
 
 foreign import javascript unsafe "$1[\"childNodes\"]"
