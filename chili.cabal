@@ -13,13 +13,12 @@ cabal-version:       >=1.10
 
 library
   build-depends:       aeson,
-                       base >=4.8 && <4.9,
+                       base >=4.8 && <4.10,
                        bytestring,
                        containers,
                        hsx2hs,
                        ghcjs-base,
                        lens,
-                       machines,
                        mtl,
                        stm,
                        text
