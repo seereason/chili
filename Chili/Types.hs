@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, FlexibleContexts, FlexibleInstances, GADTs, JavaScriptFFI, ScopedTypeVariables, TemplateHaskell, TypeFamilies #-}
+{-# LANGUAGE ConstrainedClassMethods, ExistentialQuantification, FlexibleContexts, FlexibleInstances, GADTs, JavaScriptFFI, ScopedTypeVariables, TemplateHaskell, TypeFamilies #-}
 {-# language GeneralizedNewtypeDeriving #-}
 {-# language RankNTypes #-}
 module Chili.Types where
