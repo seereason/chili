@@ -22,7 +22,7 @@ instance Show (Patch model) where
     show (Insert node) = "Insert " <> show node
     show (VText t)     = "VText " <> Text.unpack t
     show (VNode e)     = "VNode " <> show e
-    show (Props attrs) = "Props " -- <> show attrs
+    show (Props attrs) = "Props " <> show attrs
 
 diff :: forall model. Html model -> Maybe (Html model) -> Map Int [Patch model]
 diff a b = Map.fromListWith (flip (++)) (walk a b 0)

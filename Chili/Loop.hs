@@ -84,7 +84,7 @@ loop doc body initModel initAction murl handleWS view =
                      let newHtml = view sendWS model
                          patches = diff oldHtml (Just newHtml)
                      atomically $ putTMVar modelV (model, newHtml)
-                     putStrLn $ "patches: " ++ show patches
+                     -- putStrLn $ "patches: " ++ show patches
                      apply loop (updateModel modelV sendWS) doc body oldHtml patches
                      pure ()
 {-

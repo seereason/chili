@@ -29,12 +29,13 @@ instance AsChild model String where
     asChild t = [CData (pack t)]
 
 instance (parentModel ~ model) => AsChild parentModel (Html model) where
-    asChild t = [t]
+    asChild t = flattenCData [t]
 
 instance (parentModel ~ model) => AsChild parentModel [Html model] where
-    asChild t = t
+    asChild t = flattenCData t
 
 data KV k v = k := v
+    deriving (Eq, Ord, Read, Show)
 
 class AsAttr model a where
     asAttr :: a -> Attr model
