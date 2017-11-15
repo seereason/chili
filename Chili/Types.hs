@@ -240,6 +240,10 @@ instance FromJSVal JSElement where
   fromJSVal = return . fmap JSElement . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
+instance PFromJSVal JSElement where
+  pFromJSVal = JSElement
+  {-# INLINE pFromJSVal #-}
+
 instance IsJSNode JSElement where
     toJSNode = JSNode . unJSElement
 
@@ -334,16 +338,15 @@ getElementsByTagName self tagname
 
 foreign import javascript unsafe "$1[\"getElementById\"]($2)"
         js_getElementsById ::
-        JSDocument -> JSString -> IO JSElement
+        JSDocument -> JSString -> IO (Nullable JSElement)
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Document.getElementsByTagName Mozilla Document.getElementsById documentation>
 getElementById ::
                      (MonadIO m) =>
                        JSDocument -> JSString -> m (Maybe JSElement)
-getElementById self ident
-  = liftIO
-      ((js_getElementsById self ident)
-       >>= return . Just)
+getElementById self ident =
+  liftIO (nullableToMaybe <$> js_getElementsById self ident)
+
 
 -- * appendChild
 
