@@ -11,6 +11,9 @@ import Control.Lens ((^.))
 import Control.Lens.TH (makeLenses)
 import Control.Monad (when)
 import Control.Monad.Trans (MonadIO(..))
+import Chili.TDVar (TDVar, isDirtyTDVar, cleanTDVar)
+import Control.Concurrent.STM (atomically)
+import Control.Concurrent.STM.TMVar (TMVar, putTMVar, takeTMVar)
 import Data.Aeson (FromJSON, ToJSON, decodeStrict, encode)
 import qualified Data.ByteString.Lazy.Char8 as C
 import Data.Aeson.Types (Parser, Result(..), parse)
@@ -1484,8 +1487,8 @@ crTop cr = liftIO $ js_crTop cr
 data Attr model where
   Attr :: Text -> Text -> Attr model
   Prop :: Text -> Text -> Attr model
-  OnCreate :: (JSElement -> WithModel model -> IO ()) -> Attr model
-  EL :: (Show event, IsEvent event, FromJSVal (EventObjectOf event)) => event -> (EventObjectOf event -> WithModel model -> IO ()) -> Attr model
+  OnCreate :: (JSElement -> TDVar model -> IO ()) -> Attr model
+  EL :: (Show event, IsEvent event, FromJSVal (EventObjectOf event)) => event -> (EventObjectOf event -> TDVar model -> IO ()) -> Attr model
 
 instance Show (Attr model) where
   show (Attr a v) = Text.unpack a <> " := " <> Text.unpack v
@@ -1528,27 +1531,8 @@ flattenCData [] = []
 type WithModel model = (model -> IO (Maybe model)) -> IO ()
 
 type Loop = forall model remote. (Show model, ToJSON remote) =>
-            JSDocument -> JSNode -> model -> ((remote -> IO ()) -> WithModel model -> IO ()) ->
-            Maybe JS.JSString -> ((remote -> IO ()) -> MessageEvent -> WithModel model -> IO ()) -> ((remote -> IO ()) -> model -> Html model) -> IO ()
-
-renderHtml :: (MonadIO m) => Loop -> WithModel model -> JSDocument -> Html model -> m (Maybe JSNode)
-renderHtml _ _ doc (CData t) = fmap (fmap toJSNode) $ createJSTextNode doc t
-renderHtml loop withModel doc (Element tag attrs children) =
-    do me <- createJSElement doc tag
-       case me of
-         Nothing -> return Nothing
-         (Just e) ->
-             do mapM_ (\c -> appendChild e =<< renderHtml loop withModel doc c) children
-                mapM_ (doAttr e) attrs
-                return (Just $ toJSNode e)
-    where
-      doAttr elem (Attr k v)   = setAttribute elem k v
-      doAttr elem (Prop k v)   = setProperty elem k v
-      doAttr elem (OnCreate f) = liftIO $ do cb <- asyncCallback $ f elem withModel
-                                             js_setTimeout cb 0
-      doAttr elem (EL eventType eventHandler) = do
-        liftIO $ putStrLn $ "Adding event listener for " ++ show eventType
-        addEventListener elem eventType (\e -> {- putStrLn "eventHandler start" >> -} eventHandler e withModel {- >> putStrLn "eventHandler end"-}) False
+            JSDocument -> JSNode -> model -> ((remote -> IO ()) -> TDVar model -> IO ()) ->
+            Maybe JS.JSString -> ((remote -> IO ()) -> MessageEvent -> TDVar model -> IO ()) -> ((remote -> IO ()) -> model -> Html model) -> IO ()
 
 foreign import javascript unsafe "window[\"setTimeout\"]($1, $2)" js_setTimeout ::
   Callback (IO ()) -> Int -> IO ()

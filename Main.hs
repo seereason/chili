@@ -16,7 +16,8 @@ import qualified Data.Text as T
 import qualified Data.JSString as JS
 import Data.JSString.Text (textToJSString, textFromJSString)
 import Chili.Loop (loop)
-import Chili.Types (Attr(..), Control(..), EventTarget(..), EventObject(..), Event(..), IsEventTarget(..), IsEventObject(..), IsEvent(..), EventObjectOf(..), Html(..), JSDocument, JSNode, MouseEvent(..), MouseEventObject(..), MkEvent(..), js_alert, addEventListener, appendChild, currentDocument, currentTarget, createJSElement, createJSTextNode, dispatchEvent, getElementsByTagName, item, parentNode, removeChildren, setAttribute, toJSNode, maybeJSNullOrUndefined, newEvent, unJSNode, target, renderHtml, stopPropagation, js_alert, focus)
+import Chili.TDVar (modifyTDVar)
+import Chili.Types (Attr(..), Control(..), EventTarget(..), EventObject(..), Event(..), IsEventTarget(..), IsEventObject(..), IsEvent(..), EventObjectOf(..), Html(..), JSDocument, JSNode, MouseEvent(..), MouseEventObject(..), MkEvent(..), js_alert, addEventListener, appendChild, currentDocument, currentTarget, createJSElement, createJSTextNode, dispatchEvent, getElementsByTagName, item, parentNode, removeChildren, setAttribute, toJSNode, maybeJSNullOrUndefined, newEvent, unJSNode, target, stopPropagation, js_alert, focus)
 import GHCJS.Foreign (jsNull)
 import GHCJS.Types (JSVal(..), JSString(..))
 import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
@@ -85,8 +86,8 @@ app :: (() -> IO ()) -> Int -> Html Int
 app _ model =
   Element "div" []
    ([ Element "p" [] [ CData $ T.pack $ "# clicks: " ++ show model]
-    , Element "button" [EL Click (\e wm -> wm (\m -> pure (Just $ succ m)))] [CData "click me!"]
-    , Element "textarea" [OnCreate (\el wm -> focus el) ] []
+    , Element "button" [EL Click (\e m -> atomically $ modifyTDVar m succ)] [CData "click me!"]
+    , Element "textarea" [OnCreate (\el m -> focus el) ] []
    ] {- ++ (if (model >= 2)
          then [Cntl (myButton "flick me") Flicked (\_ m -> pure $ succ m)]
          else [])-} )

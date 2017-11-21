@@ -3,6 +3,8 @@
 {- Apply some patches -}
 module Chili.Patch where
 
+import Control.Concurrent.STM (atomically)
+import Control.Concurrent.STM.TMVar (TMVar, putTMVar, takeTMVar)
 import Control.Monad (when)
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans (MonadIO(..))
@@ -10,20 +12,60 @@ import Data.List (sort)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (unpack)
-import Chili.Diff (Patch(..))
-import Chili.Types (Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, WithModel, childNodes, item, getFirstChild, getLength, renderHtml, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, appendChild, descendants)
+import Chili.Diff (Patch(..), diff)
+import Chili.Types (Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, WithModel, addEventListener, childNodes, createJSElement, createJSTextNode, item, js_setTimeout, getFirstChild, getLength, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, toJSNode, appendChild, descendants)
+import Chili.TDVar (TDVar, readTDVar, cleanTDVar, isDirtyTDVar)
+import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
 
 -- | change implementation to 'putStrLn s' to enable debug output
 debugStrLn s = pure ()
 
+renderHtml :: (MonadIO m) => Loop -> TDVar model -> (remote -> IO ()) -> TMVar (Html model) -> JSDocument -> JSNode -> Html model -> ((remote -> IO ()) -> model -> Html model) -> m (Maybe JSNode)
+renderHtml _ _ _ _ doc _ (CData t) _ = fmap (fmap toJSNode) $ createJSTextNode doc t
+renderHtml loop model sendWS htmlV doc body (Element tag attrs children) view =
+    do me <- createJSElement doc tag
+       case me of
+         Nothing -> return Nothing
+         (Just e) ->
+             do mapM_ (\c -> appendChild e =<< renderHtml loop model sendWS htmlV doc body c view) children
+                mapM_ (doAttr e) attrs
+                return (Just $ toJSNode e)
+    where
+      doAttr elem (Attr k v)   = setAttribute elem k v
+      doAttr elem (Prop k v)   = setProperty elem k v
+      doAttr elem (OnCreate f) = liftIO $ do cb <- asyncCallback $ f elem model
+                                             js_setTimeout cb 0
+      doAttr elem (EL eventType eventHandler) = do
+        liftIO $ putStrLn $ "Adding event listener for " ++ show eventType
+        addEventListener elem eventType (\e -> {- putStrLn "eventHandler start" >> -} (handleAndUpdate eventHandler e model) {- >> putStrLn "eventHandler end"-}) False
+
+      handleAndUpdate eventHandler e model =
+        do eventHandler e model
+           dirty <- atomically $ isDirtyTDVar model
+           if not dirty
+             then pure ()
+             else do -- putStrLn "handleAndUpdate"
+                     atomically $ cleanTDVar model
+                     oldHtml <- atomically $ takeTMVar htmlV
+                     model' <- atomically $ readTDVar model
+                     let newHtml = view sendWS model'
+                         patches = diff oldHtml (Just newHtml)
+                     apply loop model sendWS htmlV doc body view body oldHtml patches
+                     atomically $ putTMVar htmlV newHtml
+                     pure ()
+
 apply :: Loop
-      -> WithModel model -- ((model -> IO model) -> IO ())
+      -> TDVar model -- ((model -> IO model) -> IO ())
+      -> (remote -> IO ())
+      -> TMVar (Html model)
       -> JSDocument
+      -> JSNode
+      -> ((remote -> IO ()) -> model -> Html model)
       -> JSNode
       -> Html model
       -> Map Int [Patch model]
       -> IO JSNode
-apply loop withModel document rootNode vdom patches =
+apply loop model sendWS htmlV document body view rootNode vdom patches =
     do let indices = Map.keys patches
        case indices of
         [] -> pure rootNode
@@ -32,29 +74,37 @@ apply loop withModel document rootNode vdom patches =
                 (Just first) <- getFirstChild rootNode -- FIXME: handle Nothing
                 nodeList <- getNodes first vdom indices
                 -- debugStrLn $ "nodeList length = " ++ show (length nodeList)
-                mapM_ (apply' loop withModel document patches) nodeList
+                mapM_ (apply' loop model sendWS htmlV document body view patches) nodeList
                 return rootNode
 
 apply' :: Loop
-       -> WithModel model -- ((model -> IO model) -> IO ())
+       -> TDVar model -- ((model -> IO model) -> IO ())
+       -> (remote -> IO ())
+       -> TMVar (Html model)
        -> JSDocument
+       -> JSNode
+       -> ((remote -> IO ()) -> model -> Html model)
        -> Map Int [Patch model]
        -> (Int, JSNode)
        -> IO ()
-apply' loop withModel document patchMap (index, node) = do
+apply' loop model sendWS htmlV document body view patchMap (index, node) = do
     debugStrLn $ "apply' with index = " ++ show index
     case Map.lookup index patchMap of
       (Just patches) ->
-          mapM_ (apply'' loop withModel document node) patches
+          mapM_ (apply'' loop model sendWS htmlV document body view node) patches
       Nothing -> error $ "Y NO PATCH? " ++ show index
 
 apply'' :: Loop
-        -> WithModel model -- ((model -> IO model) -> IO ())
+        -> TDVar model -- ((model -> IO model) -> IO ())
+        -> (remote -> IO ())
+        -> TMVar (Html model)
         -> JSDocument
+        -> JSNode
+        -> ((remote -> IO ()) -> model -> Html model)
         -> JSNode
         -> Patch model
         -> IO ()
-apply'' loop withModel document node patch =
+apply'' loop model sendWS htmlV document body view node patch =
     case patch of
       (VText t) -> do oldLength <- getLength node
                       -- debugStrLn $  "replaceData(0" ++ ", " ++ show oldLength ++ ", " ++ unpack t ++ ")"
@@ -79,7 +129,7 @@ apply'' loop withModel document node patch =
                Nothing -> pure () -- debugStrLn $ "Can't appendChild because there is no parentNode"
                (Just parent) ->
                    do -- debugStrLn $  "Insert --> " ++ show elem
-                      child <- renderHtml loop withModel document elem
+                      child <- renderHtml loop model sendWS htmlV document body elem view
                       appendChild node child
                       return ()
       Remove ->
@@ -96,7 +146,7 @@ apply'' loop withModel document node patch =
                Nothing -> debugStrLn $ "Can't replaceChild because there is no parentNode"
                (Just parent) ->
                    do debugStrLn "replacing old node with new"
-                      (Just newChild) <- renderHtml loop withModel document newElem
+                      (Just newChild) <- renderHtml loop model sendWS htmlV document body newElem view
                       replaceChild parent newChild node
                       return ()
 

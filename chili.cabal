@@ -27,6 +27,7 @@ library
                   Chili.Diff
                   Chili.HSX
                   Chili.Patch
+                  Chili.TDVar
                   Chili.Types
                   Chili.Loop
 

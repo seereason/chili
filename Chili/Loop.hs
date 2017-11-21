@@ -7,6 +7,7 @@ import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TMVar (TMVar, newTMVar, newEmptyTMVar, takeTMVar, putTMVar)
 import Chili.Diff
 import Chili.Patch
+import Chili.TDVar
 import Chili.Types
 import Data.Aeson (FromJSON, ToJSON, decodeStrict, encode)
 import Data.JSString.Text (textToJSString)
@@ -52,25 +53,27 @@ loop :: forall remote model. (ToJSON remote) =>
         JSDocument
      -> JSNode
      -> model
-     -> ((remote -> IO ()) -> WithModel model -> IO ())
+     -> ((remote -> IO ()) -> TDVar model -> IO ())
      -> Maybe JS.JSString
-     -> ((remote -> IO ()) -> MessageEvent -> WithModel model -> IO ())
+     -> ((remote -> IO ()) -> MessageEvent -> TDVar model -> IO ())
      -> ((remote -> IO ()) -> model -> Html model)
      -> IO ()
 loop doc body initModel initAction murl handleWS view =
   do putStrLn "loop"
-     modelV <- atomically $ newEmptyTMVar -- (initModel, html)
+     htmlV <- atomically $ newEmptyTMVar -- html -- (initModel, html)
+     model <- atomically $ newTDVar initModel
      rec sendWS <- case murl of
                     Nothing -> pure (\_ -> pure ())
-                    (Just url) -> initRemoteWS url (\me -> handleWS sendWS me (updateModel modelV sendWS))
+                    (Just url) -> initRemoteWS url (\me -> handleWS sendWS me model)
      let html = view sendWS initModel
-     atomically $ putTMVar modelV (initModel, html)
-     (Just node) <- renderHtml loop (updateModel modelV sendWS) doc html
+     atomically $ putTMVar htmlV html
+     (Just node) <- renderHtml loop model sendWS htmlV doc body html view
      removeChildren body
      appendChild body (Just node)
-     initAction sendWS (updateModel modelV sendWS)
+     initAction sendWS model -- (updateModel modelV sendWS)
      pure ()
        where
+{-
          updateModel :: TMVar (model, Html model) -> (remote -> IO ()) ->  (model -> IO (Maybe model)) -> IO ()
          updateModel modelV sendWS f =
            do old@(oldModel, oldHtml) <- atomically $ takeTMVar modelV
@@ -81,12 +84,13 @@ loop doc body initModel initAction murl handleWS view =
                               pure ()
                 (Just model) ->
                   do -- putStrLn "loop: changed."
-                     let newHtml = view sendWS model
+                    let newHtml = view sendWS model
                          patches = diff oldHtml (Just newHtml)
                      atomically $ putTMVar modelV (model, newHtml)
                      -- putStrLn $ "patches: " ++ show patches
                      apply loop (updateModel modelV sendWS) doc body oldHtml patches
                      pure ()
+-}
 {-
          loop' doc body initModel initAction view =
            do loop doc body initModel initAction view
