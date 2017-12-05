@@ -6,6 +6,8 @@ import Data.Text (Text, pack, unpack)
 import GHCJS.Marshal.Pure (pFromJSVal)
 import GHCJS.Types (JSVal(..), JSString(..))
 import Chili.Types (Attr(Attr, EL), Html(Element, CData, Cntl), flattenCData, descendants)
+import qualified Data.JSString as JS
+import qualified Data.JSString.Text as JS
 
 default (Text)
 
@@ -42,6 +44,10 @@ class AsAttr model a where
 
 instance AsAttr model (KV Text Text) where
     asAttr (k := v) = Attr k v
+
+instance AsAttr model (KV Text JS.JSString) where
+    asAttr (k := v) = Attr k (JS.textFromJSString v)
+
 {-
 instance AsAttr model (KV Text model) where
     asAttr (type' := model) =
