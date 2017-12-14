@@ -888,6 +888,24 @@ foreign import javascript unsafe "$1[\"clientY\"]" clientY ::
 foreign import javascript unsafe "$1[\"button\"]" button ::
         MouseEventObject -> Int
 
+foreign import javascript unsafe "$1[\"shiftKey\"]" mouse_shiftKey ::
+        MouseEventObject -> Bool
+
+foreign import javascript unsafe "$1[\"ctrlKey\"]" mouse_ctrlKey ::
+        MouseEventObject -> Bool
+
+foreign import javascript unsafe "$1[\"altKey\"]" mouse_altKey ::
+        MouseEventObject -> Bool
+
+foreign import javascript unsafe "$1[\"metaKey\"]" mouse_metaKey ::
+        MouseEventObject -> Bool
+
+instance HasModifierKeys MouseEventObject where
+  shiftKey = mouse_shiftKey
+  ctrlKey  = mouse_ctrlKey
+  altKey   = mouse_altKey
+  metaKey  = mouse_metaKey
+
 -- * KeyboardEventObject
 
 newtype KeyboardEventObject = KeyboardEventObject { unKeyboardEventObject :: JSVal }
@@ -902,12 +920,38 @@ instance FromJSVal KeyboardEventObject where
 
 instance IsEventObject KeyboardEventObject where
   asEventObject (KeyboardEventObject jsval) = EventObject jsval
+  
 
 foreign import javascript unsafe "$1[\"charCode\"]" charCode ::
         KeyboardEventObject -> Int
 
 foreign import javascript unsafe "$1[\"keyCode\"]" keyCode ::
         KeyboardEventObject -> Int
+
+
+class HasModifierKeys obj where
+  shiftKey :: obj -> Bool
+  ctrlKey  :: obj -> Bool
+  altKey   :: obj -> Bool
+  metaKey  :: obj -> Bool
+
+foreign import javascript unsafe "$1[\"shiftKey\"]" keyboard_shiftKey ::
+        KeyboardEventObject -> Bool
+
+foreign import javascript unsafe "$1[\"ctrlKey\"]" keyboard_ctrlKey ::
+        KeyboardEventObject -> Bool
+
+foreign import javascript unsafe "$1[\"altKey\"]" keyboard_altKey ::
+        KeyboardEventObject -> Bool
+
+foreign import javascript unsafe "$1[\"metaKey\"]" keyboard_metaKey ::
+        KeyboardEventObject -> Bool
+
+instance HasModifierKeys KeyboardEventObject where
+  shiftKey = keyboard_shiftKey
+  ctrlKey  = keyboard_ctrlKey
+  altKey   = keyboard_altKey
+  metaKey  = keyboard_metaKey
 
 -- * ProgressEventObject
 
