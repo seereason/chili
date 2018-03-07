@@ -14,9 +14,9 @@ let
         isLibrary = true;
         isExecutable = false;
         libraryHaskellDepends = [
-          aeson base bytestring containers ghcjs-base lens mtl text hsx2hs stm hspec
-        ];
-        buildTools = [ pkgs.haskellPackages.ghc pkgs.haskellPackages.cabal-install ];
+          aeson base bytestring containers ghcjs-base lens mtl text hsx2hs stm hspec pkgs.haskellPackages.cabal-install
+        ]; 
+        buildTools = [ pkgs.haskellPackages.ghc  ];
         description = "yet another clientside ui library";
         license = stdenv.lib.licenses.bsd3;
       };

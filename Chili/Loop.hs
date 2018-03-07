@@ -6,6 +6,7 @@ module Chili.Loop where
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TMVar (TMVar, newTMVar, newEmptyTMVar, takeTMVar, putTMVar)
 import Chili.Diff
+import Chili.Internal (debugStrLn)
 import Chili.Patch
 import Chili.TDVar
 import Chili.Types
@@ -59,7 +60,7 @@ loop :: forall remote model. (ToJSON remote) =>
      -> ((remote -> IO ()) -> model -> Html model)
      -> IO ()
 loop doc body initModel initAction murl handleWS view =
-  do putStrLn "loop"
+  do debugStrLn "loop"
      htmlV <- atomically $ newEmptyTMVar -- html -- (initModel, html)
      model <- atomically $ newTDVar initModel
      rec sendWS <- case murl of
@@ -71,6 +72,7 @@ loop doc body initModel initAction murl handleWS view =
      removeChildren body
      appendChild body (Just node)
      initAction sendWS model -- (updateModel modelV sendWS)
+     updateView loop model sendWS htmlV doc body view
      pure ()
        where
 {-

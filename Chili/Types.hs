@@ -11,6 +11,7 @@ import Control.Lens ((^.))
 import Control.Lens.TH (makeLenses)
 import Control.Monad (when)
 import Control.Monad.Trans (MonadIO(..))
+import Chili.Internal (debugPrint, debugStrLn)
 import Chili.TDVar (TDVar, isDirtyTDVar, cleanTDVar)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TMVar (TMVar, putTMVar, takeTMVar)
@@ -1328,9 +1329,9 @@ foreign import javascript unsafe "$1[\"responseURL\"]"
 sendRemoteWS :: (ToJSON remote) => WebSocket -> remote -> IO ()
 sendRemoteWS ws remote =
   do let jstr = JS.pack (C.unpack $ encode remote)
-     putStrLn $ "send WS: " ++ JS.unpack jstr
+     debugStrLn $ "send WS: " ++ JS.unpack jstr
      WebSockets.send jstr ws
-     putStrLn $ "sent."
+     debugStrLn $ "sent."
 
 initRemoteWS :: (ToJSON remote) => JS.JSString -> (MessageEvent -> IO ()) -> IO (remote -> IO ())
 initRemoteWS url' onMessageHandler =

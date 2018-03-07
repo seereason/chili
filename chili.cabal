@@ -30,6 +30,7 @@ library
                   Chili.TDVar
                   Chili.Types
                   Chili.Loop
+                  Chili.Internal
 
 
 Test-suite spec

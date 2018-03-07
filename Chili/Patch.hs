@@ -13,12 +13,10 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (unpack)
 import Chili.Diff (Patch(..), diff)
+import Chili.Internal (debugStrLn, debugPrint)
 import Chili.Types (Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, WithModel, addEventListener, childNodes, createJSElement, createJSTextNode, item, js_setTimeout, getFirstChild, getLength, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, toJSNode, appendChild, descendants)
 import Chili.TDVar (TDVar, readTDVar, cleanTDVar, isDirtyTDVar)
 import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
-
--- | change implementation to 'putStrLn s' to enable debug output
-debugStrLn s = pure ()
 
 renderHtml :: (MonadIO m) => Loop -> TDVar model -> (remote -> IO ()) -> TMVar (Html model) -> JSDocument -> JSNode -> Html model -> ((remote -> IO ()) -> model -> Html model) -> m (Maybe JSNode)
 renderHtml _ _ _ _ doc _ (CData t) _ = fmap (fmap toJSNode) $ createJSTextNode doc t
@@ -36,11 +34,13 @@ renderHtml loop model sendWS htmlV doc body (Element tag attrs children) view =
       doAttr elem (OnCreate f) = liftIO $ do cb <- asyncCallback $ f elem model
                                              js_setTimeout cb 0
       doAttr elem (EL eventType eventHandler) = do
-        liftIO $ putStrLn $ "Adding event listener for " ++ show eventType
+        liftIO $ debugStrLn $ "Adding event listener for " ++ show eventType
         addEventListener elem eventType (\e -> {- putStrLn "eventHandler start" >> -} (handleAndUpdate eventHandler e model) {- >> putStrLn "eventHandler end"-}) False
 
       handleAndUpdate eventHandler e model =
         do eventHandler e model
+           updateView loop model sendWS htmlV doc body view
+{-
            dirty <- atomically $ isDirtyTDVar model
            if not dirty
              then pure ()
@@ -52,6 +52,24 @@ renderHtml loop model sendWS htmlV doc body (Element tag attrs children) view =
                          patches = diff oldHtml (Just newHtml)
                      apply loop model sendWS htmlV doc body view body oldHtml patches
                      atomically $ putTMVar htmlV newHtml
+                     pure ()
+-}
+updateView :: Loop -> TDVar model -> (remote -> IO ()) -> TMVar (Html model) -> JSDocument -> JSNode -> ((remote -> IO ()) -> model -> Html model) -> IO ()
+updateView loop model sendWS htmlV doc body view = do
+           dirty <- atomically $ isDirtyTDVar model
+           if not dirty
+             then do debugStrLn "not dirty"
+                     pure ()
+             else do -- putStrLn "handleAndUpdate"
+                     debugStrLn "dirty -- update view"
+                     atomically $ cleanTDVar model
+                     oldHtml <- atomically $ takeTMVar htmlV
+                     model' <- atomically $ readTDVar model
+                     let newHtml = view sendWS model'
+                         patches = diff oldHtml (Just newHtml)
+                     apply loop model sendWS htmlV doc body view body oldHtml patches
+                     atomically $ putTMVar htmlV newHtml
+--                     print (newHtml, patches)
                      pure ()
 
 apply :: Loop
@@ -192,7 +210,7 @@ getNodes currNode vdom nodeIndices = do
                 -> StateT Int IO [(Int, JSNode)]
       -- if we are not looking for any more indices then we are done
       getNodes' _ _ [] = return []
-      getNodes' currNode node@(Cntl {}) is@(i:_) = liftIO (print is) >> pure [] -- FIXME: surely not right
+      getNodes' currNode node@(Cntl {}) is@(i:_) = liftIO (debugPrint is) >> pure [] -- FIXME: surely not right
       -- if the current vdom node is CData, then it can match at most 1 index
       getNodes' currNode node@(CData _) (i:is) =
           do index <- get
