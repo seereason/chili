@@ -58,7 +58,7 @@ loop :: forall remote model. (ToJSON remote) =>
      -> Maybe JS.JSString
      -> ((remote -> IO ()) -> MessageEvent -> TDVar model -> IO ())
      -> ((remote -> IO ()) -> model -> Html model)
-     -> IO ()
+     -> IO (TDVar model)
 loop doc body initModel initAction murl handleWS view =
   do debugStrLn "loop"
      htmlV <- atomically $ newEmptyTMVar -- html -- (initModel, html)
@@ -73,7 +73,7 @@ loop doc body initModel initAction murl handleWS view =
      appendChild body (Just node)
      initAction sendWS model -- (updateModel modelV sendWS)
      updateView loop model sendWS htmlV doc body view
-     pure ()
+     pure model
        where
 {-
          updateModel :: TMVar (model, Html model) -> (remote -> IO ()) ->  (model -> IO (Maybe model)) -> IO ()

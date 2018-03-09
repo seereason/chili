@@ -1577,7 +1577,7 @@ type WithModel model = (model -> IO (Maybe model)) -> IO ()
 
 type Loop = forall model remote. (Show model, ToJSON remote) =>
             JSDocument -> JSNode -> model -> ((remote -> IO ()) -> TDVar model -> IO ()) ->
-            Maybe JS.JSString -> ((remote -> IO ()) -> MessageEvent -> TDVar model -> IO ()) -> ((remote -> IO ()) -> model -> Html model) -> IO ()
+            Maybe JS.JSString -> ((remote -> IO ()) -> MessageEvent -> TDVar model -> IO ()) -> ((remote -> IO ()) -> model -> Html model) -> IO (TDVar model)
 
 foreign import javascript unsafe "window[\"setTimeout\"]($1, $2)" js_setTimeout ::
   Callback (IO ()) -> Int -> IO ()
