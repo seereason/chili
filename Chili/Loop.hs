@@ -65,7 +65,9 @@ loop doc body initModel initAction murl handleWS view =
      model <- atomically $ newTDVar initModel
      rec sendWS <- case murl of
                     Nothing -> pure (\_ -> pure ())
-                    (Just url) -> initRemoteWS url (\me -> handleWS sendWS me model)
+                    (Just url) -> initRemoteWS url (\me -> do handleWS sendWS me model
+                                                              updateView loop model sendWS htmlV doc body view
+                                                   )
      let html = view sendWS initModel
      atomically $ putTMVar htmlV html
      (Just node) <- renderHtml loop model sendWS htmlV doc body html view

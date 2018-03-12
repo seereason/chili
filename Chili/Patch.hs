@@ -62,9 +62,11 @@ updateView loop model sendWS htmlV doc body view = do
                      pure ()
              else do -- putStrLn "handleAndUpdate"
                      debugStrLn "dirty -- update view"
-                     atomically $ cleanTDVar model
-                     oldHtml <- atomically $ takeTMVar htmlV
-                     model' <- atomically $ readTDVar model
+                     (oldHtml, model') <- atomically $
+                       do cleanTDVar model
+                          oldHtml <- takeTMVar htmlV
+                          model' <- readTDVar model
+                          pure (oldHtml, model')
                      let newHtml = view sendWS model'
                          patches = diff oldHtml (Just newHtml)
                      apply loop model sendWS htmlV doc body view body oldHtml patches
