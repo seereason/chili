@@ -4,11 +4,11 @@
 {-# language TypeFamilies #-}
 {-# language OverloadedStrings #-}
 {-# language ScopedTypeVariables #-}
+{-# LANGUAGE QuasiQuotes #-}
 module Main where
 
 import Control.Monad.Trans (MonadIO(..))
 import Control.Concurrent.STM (atomically)
-import Control.Concurrent.STM.TMVar (TMVar, newTMVar, newEmptyTMVar, takeTMVar, putTMVar)
 import Data.Char (chr)
 import Data.Monoid ((<>))
 import Data.Text (Text)
@@ -18,20 +18,20 @@ import Data.JSString.Text (textToJSString, textFromJSString)
 import Chili.Loop (loop)
 import Chili.TDVar (modifyTDVar)
 import Chili.Types (Attr(..), Control(..), EventTarget(..), EventObject(..), Event(..), IsEventTarget(..), IsEventObject(..), IsEvent(..), EventObjectOf(..), Html(..), JSDocument, JSNode, MouseEvent(..), MouseEventObject(..), MkEvent(..), js_alert, addEventListener, appendChild, currentDocument, currentTarget, createJSElement, createJSTextNode, dispatchEvent, getElementsByTagName, item, parentNode, removeChildren, setAttribute, toJSNode, maybeJSNullOrUndefined, newEvent, unJSNode, target, stopPropagation, js_alert, focus)
+import Chili.HSX
 import GHCJS.Foreign (jsNull)
 import GHCJS.Types (JSVal(..), JSString(..))
 import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
-
+import Language.Haskell.HSX.QQ (hsx)
 
 
 -- * Custom button tag which emits `Flicked` instead of `Click`
-
 
 -- | custom `MyButtonEvent`
 data MyButtonEvent = Flicked
  deriving (Eq, Show)
 
--- | way too much boilerplate
+-- | way too much boilerplate -- insert template-haskell here?
 instance IsEvent MyButtonEvent where
   eventToJSString Flicked = "flicked"
 
@@ -56,42 +56,64 @@ instance IsEventObject MyButtonEventObject where
 
 type instance EventObjectOf MyButtonEvent   = MyButtonEventObject
 
+-- end of boilerplate
+
 -- | implementation of myButton
 --
 -- Note that is uses the model/view pattern
 --
 -- This button displays how many times it has been clicked
-{-
 myButton :: Text -> Control MyButtonEvent
 myButton msg =
   Control { cmodel = 0
-          , cview = \i ->
-              Element "button" [EL Click clickHandler]
-               [CData (msg <> " " <> T.pack (show i))]
+          , cinit = \_ _ -> pure ()
+          , cview = \_ i ->
+              [hsx|
+                 <button [EL Click clickHandler]><% msg <> " " <> T.pack (show i) %></button>
+              |]
           }
   where
     clickHandler e m = do
       stopPropagation e
       toggleEventObject <- newEvent Flicked True True
       dispatchEvent (target e) toggleEventObject
-      pure (succ m)
--}
+      atomically $ modifyTDVar m succ
+      pure ()
+
 -- | an app which uses `myButton`
 --
 -- We have two buttons, which increment the global counter.
 -- One regular button and one myButton.
 --
 -- We do not show the `myButton` until the global counter is >= 2
+--
+-- Note that the internal state of the myButton counter is not recorded in the global model.
+--
+-- Note also that we can only attach a single event handler to the
+-- embedded control. That is a bug -- there is no fundamental reason
+-- for that limitation.
 app :: (() -> IO ()) -> Int -> Html Int
 app _ model =
+  [hsx|
+    <div>
+      <p><% "# clicks: " ++ show model %></p>
+      <button [ EL Click   (\e m -> atomically $ modifyTDVar m succ) ]>click me!</button>
+      <% if model >= 2
+           then [Cntl (myButton "flick me") Flicked (\_ m -> atomically $ modifyTDVar m succ)]
+           else []
+       %>
+    </div>
+   |]
+{-
   Element "div" []
    ([ Element "p" [] [ CData $ T.pack $ "# clicks: " ++ show model]
-    , Element "button" [EL Click (\e m -> atomically $ modifyTDVar m succ)] [CData "click me!"]
-    , Element "textarea" [OnCreate (\el m -> focus el) ] []
-   ] {- ++ (if (model >= 2)
-         then [Cntl (myButton "flick me") Flicked (\_ m -> pure $ succ m)]
-         else [])-} )
-
+    , Element "button" 
+                       ]
+      [CData "click me!"]
+   ] ++ (if (model >= 2)
+         then [Cntl (myButton "flick me") Flicked (\_ m -> atomically $ modifyTDVar m succ)]
+         else []) )
+-}
 -- | a pretty standard main function
 main :: IO ()
 main =
@@ -99,6 +121,7 @@ main =
      (Just nodes) <- getElementsByTagName doc "body"
      (Just body)  <- item nodes 0
      loop doc body 0 (\_ _ -> pure ()) Nothing (\_ _ _ -> pure ()) app
+     pure ()
 
 
 

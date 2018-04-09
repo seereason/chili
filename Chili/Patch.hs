@@ -3,6 +3,7 @@
 {- Apply some patches -}
 module Chili.Patch where
 
+import Control.Concurrent (forkIO)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TMVar (TMVar, putTMVar, takeTMVar)
 import Control.Monad (when)
@@ -12,13 +13,24 @@ import Data.List (sort)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (unpack)
+import qualified Data.Text as Text
 import Chili.Diff (Patch(..), diff)
 import Chili.Internal (debugStrLn, debugPrint)
-import Chili.Types (Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, WithModel, addEventListener, childNodes, createJSElement, createJSTextNode, item, js_setTimeout, getFirstChild, getLength, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, toJSNode, appendChild, descendants)
+import Chili.Types (Control(..), Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, WithModel, addEventListener, childNodes, createJSElement, createJSTextNode, item, js_setTimeout, getFirstChild, getLength, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, toJSNode, appendChild, descendants)
 import Chili.TDVar (TDVar, readTDVar, cleanTDVar, isDirtyTDVar)
 import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
 
 renderHtml :: (MonadIO m) => Loop -> TDVar model -> (remote -> IO ()) -> TMVar (Html model) -> JSDocument -> JSNode -> Html model -> ((remote -> IO ()) -> model -> Html model) -> m (Maybe JSNode)
+renderHtml loop model sendWS htmlV doc body (Cntl (Control cmodel cinit cview) eventType eventHandler) view =
+  do (Just cBody) <- fmap toJSNode <$> createJSElement doc (Text.pack "span")
+     tid <- liftIO $ forkIO (loop doc cBody cmodel cinit Nothing (\_ _ _ -> pure ()) cview >> pure ())
+     addEventListener cBody eventType (\e -> handleAndUpdate eventHandler e model) False
+     pure (Just cBody)
+     where
+       handleAndUpdate eventHandler e model =
+        do eventHandler e model
+           updateView loop model sendWS htmlV doc body view -- or should this be cview?
+
 renderHtml _ _ _ _ doc _ (CData t) _ = fmap (fmap toJSNode) $ createJSTextNode doc t
 renderHtml loop model sendWS htmlV doc body (Element tag attrs children) view =
     do me <- createJSElement doc tag

@@ -1,22 +1,21 @@
-{ nixpkgs ? import <nixpkgs> {}, compiler ? "ghcjs" }:
+{ nixpkgs ? import <nixpkgs> {}, compiler ? "ghcjs", doBenchmark ? false }:
 
 let
 
   inherit (nixpkgs) pkgs;
 
-  f = { mkDerivation, aeson, base, bytestring, containers, ghcjs-base, lens, mtl
-      , stdenv, text, hsx2hs, stm, hspec
+  f = { mkDerivation, aeson, base, bytestring, containers
+      , ghcjs-base, hspec, hsx2hs, lens, mtl, stdenv, stm, text
       }:
       mkDerivation {
         pname = "chili";
-        version = "0.1.0.0";
+        version = "0.1.2.0";
         src = ./.;
-        isLibrary = true;
-        isExecutable = false;
         libraryHaskellDepends = [
-          aeson base bytestring containers ghcjs-base lens mtl text hsx2hs stm hspec pkgs.haskellPackages.cabal-install
-        ]; 
-        buildTools = [ pkgs.haskellPackages.ghc  ];
+          aeson base bytestring containers ghcjs-base hsx2hs lens mtl stm
+          text
+        ];
+        testHaskellDepends = [ base containers hspec hsx2hs text ];
         description = "yet another clientside ui library";
         license = stdenv.lib.licenses.bsd3;
       };
@@ -25,7 +24,9 @@ let
                        then pkgs.haskellPackages
                        else pkgs.haskell.packages.${compiler};
 
-  drv = haskellPackages.callPackage f {};
+  variant = if doBenchmark then pkgs.haskell.lib.doBenchmark else pkgs.lib.id;
+
+  drv = variant (haskellPackages.callPackage f {});
 
 in
 

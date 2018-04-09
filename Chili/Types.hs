@@ -1543,18 +1543,19 @@ instance Show (Attr model) where
 
 data Html model where
   Element :: Text -> [Attr model] -> [Html model] -> Html model
-  CData :: Text -> Html model
-  Cntl :: (Show event, IsEvent event, FromJSVal (EventObjectOf event)) => Control event -> event -> (EventObjectOf event -> (model -> IO model) -> IO ()) -> Html model
+  CData   :: Text -> Html model
+  Cntl    :: (Show event, IsEvent event, FromJSVal (EventObjectOf event)) =>
+              Control event -> event -> (EventObjectOf event -> TDVar model -> IO ()) -> Html model
 
 instance Show (Html model) where
   show (Element n attrs elems) = "Element " <> Text.unpack n <> " " <> show attrs <> " " <> show elems
   show (CData t) = "CData " <> Text.unpack t
   show (Cntl _ e _) = "Cntl " ++ show e
 
-data Control event = forall model. (Show model) => Control
+data Control event = forall model remote. (Show model) => Control
   { cmodel  :: model
-  , cinit   :: model -> IO model
-  , cview   :: model -> Html model
+  , cinit   :: (() -> IO ()) -> TDVar model -> IO ()
+  , cview   :: (() -> IO ()) -> model -> Html model
   }
 
 descendants :: [Html model] -> Int
