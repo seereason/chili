@@ -178,9 +178,6 @@ fillText ctx txt x y (Just maxWidth) = liftIO $ js_fillTextMaxWidth ctx txt x y 
 foreign import javascript unsafe "$1[\"scale\"]($2, $3)"
   js_scale :: JSContext2D -> Double -> Double -> IO ()
 
-foreign import javascript unsafe "alert($1)"
-  js_alert :: JSString -> IO ()
-
 scale :: (MonadIO m) => JSContext2D -> Double -> Double -> m ()
 scale ctx x y = liftIO $ js_scale ctx x y
 

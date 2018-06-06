@@ -61,6 +61,10 @@ fromJSValUnchecked j =
          Nothing -> error "failed."
          (Just a) -> return a
 -}
+
+foreign import javascript unsafe "alert($1)"
+  js_alert :: JSString -> IO ()
+
 -- * JSNode
 
 newtype JSNode = JSNode JSVal
