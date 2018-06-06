@@ -16,7 +16,7 @@ import Data.Text (unpack)
 import qualified Data.Text as Text
 import Chili.Diff (Patch(..), diff)
 import Chili.Internal (debugStrLn, debugPrint)
-import Chili.Types (Control(..), Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, WithModel, addEventListener, childNodes, createJSElement, createJSTextNode, item, js_setTimeout, getFirstChild, getLength, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, toJSNode, appendChild, descendants)
+import Chili.Types (Control(..), Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, WithModel, addEventListener, childNodes, createJSElement, createJSTextNode, item, js_setTimeout, getFirstChild, getLength, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, toJSNode, appendChild, descendants, nodeType, currentDocument)
 import Chili.TDVar (TDVar, readTDVar, cleanTDVar, isDirtyTDVar)
 import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
 
@@ -81,9 +81,9 @@ updateView loop model sendWS htmlV doc body view = do
                           pure (oldHtml, model')
                      let newHtml = view sendWS model'
                          patches = diff oldHtml (Just newHtml)
+                     print (oldHtml, newHtml, patches)
                      apply loop model sendWS htmlV doc body view body oldHtml patches
                      atomically $ putTMVar htmlV newHtml
---                     print (newHtml, patches)
                      pure ()
 
 apply :: Loop
@@ -138,9 +138,24 @@ apply'' :: Loop
         -> IO ()
 apply'' loop model sendWS htmlV document body view node patch =
     case patch of
-      (VText t) -> do oldLength <- getLength node
-                      -- debugStrLn $  "replaceData(0" ++ ", " ++ show oldLength ++ ", " ++ unpack t ++ ")"
-                      replaceData node 0 oldLength t -- (escape b t)
+      (VText t) -> do nt <- nodeType node
+                      case nt of
+                        -- if the existing node is text we can just replace the text content
+                        3 -> do oldLength <- getLength node
+                                -- debugStrLn $  "replaceData(0" ++ ", " ++ show oldLength ++ ", " ++ unpack t ++ ")"
+                                replaceData node 0 oldLength t -- (escape b t)
+                        -- otherwise we need to replace the node entirely
+                        _ -> do mparent <- parentNode node
+                                case mparent of
+                                  Nothing -> debugStrLn $ "Can't replaceChild because there is no parentNode"
+                                  (Just parent) ->
+                                    do debugStrLn "replacing old node with new text"
+                                       -- (Just newChild) <- renderHtml loop model sendWS htmlV document body newElem view
+                                       (Just doc) <- currentDocument
+                                       (Just newChild) <- createJSTextNode doc t
+                                       replaceChild parent newChild node
+                                       return ()
+
       (Props newProps) -> -- FIXME: doesn't handle changes to events.
           do let e = JSElement $ unJSNode node
              debugStrLn $ "set Attr: " ++ show [ (k,v) | Attr k v <- newProps ]

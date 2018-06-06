@@ -13,7 +13,7 @@ let
         src = ./.;
         libraryHaskellDepends = [
           aeson base bytestring containers ghcjs-base hsx2hs lens mtl stm
-          text
+          text pkgs.haskellPackages.cabal-install pkgs.haskellPackages.ghc
         ];
         testHaskellDepends = [ base containers hspec hsx2hs text ];
         description = "yet another clientside ui library";
