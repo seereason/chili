@@ -60,9 +60,9 @@ walk a mb index =
                 childrenPatches = diffChildren index childrenA childrenB index
             in propsPatches ++ childrenPatches
       _ -> [(index, [VNode b])]
-   (Just (CData  txtB)) ->
+   (Just (CData txtB)) ->
      case a of
-      (CData  txtA)
+      (CData txtA)
         | txtA == txtB -> []
       _ -> [(index, [VText txtB])]
    (Just b@cntl) ->
@@ -78,7 +78,7 @@ diffChildren parentIndex childrenA childrenB index =
    ([], (b:bs)) ->
      (parentIndex, [Insert b]) : diffChildren parentIndex [] bs (index + 1)
    ((a:as), []) ->
-     (walk a Nothing (index + 1)) ++ (diffChildren parentIndex as [] (index + 1 + (elementDescendants' a)))
+     (walk a Nothing  (index + 1)) ++ (diffChildren parentIndex as [] (index + 1 + (elementDescendants' a)))
    ((a:as), (b:bs)) ->
      (walk a (Just b) (index + 1)) ++ (diffChildren parentIndex as bs (index + 1 + (elementDescendants' a)))
   where

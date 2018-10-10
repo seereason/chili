@@ -81,7 +81,10 @@ updateView loop model sendWS htmlV doc body view = do
                           pure (oldHtml, model')
                      let newHtml = view sendWS model'
                          patches = diff oldHtml (Just newHtml)
-                     print (oldHtml, newHtml, patches)
+                     debugStrLn $ "oldHtml = " ++ show oldHtml
+                     debugStrLn $ "newHtml = " ++ show newHtml
+                     debugStrLn $ "patches = " ++ show patches -- (oldHtml, newHtml, patches)
+--                     debugPrint (oldHtml, newHtml, patches)
                      apply loop model sendWS htmlV doc body view body oldHtml patches
                      atomically $ putTMVar htmlV newHtml
                      pure ()
