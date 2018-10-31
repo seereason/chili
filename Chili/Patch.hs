@@ -16,7 +16,7 @@ import Data.Text (unpack)
 import qualified Data.Text as Text
 import Chili.Diff (Patch(..), diff)
 import Chili.Internal (debugStrLn, debugPrint)
-import Chili.Types (Control(..), Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, WithModel, addEventListener, childNodes, createJSElement, createJSTextNode, item, js_setTimeout, getFirstChild, getLength, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, toJSNode, appendChild, descendants, nodeType, currentDocument)
+import Chili.Types (Control(..), Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, VDOMEvent(..), WithModel, addEventListener, childNodes, createJSElement, createJSTextNode, item, js_setTimeout, getFirstChild, getLength, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, toJSNode, appendChild, descendants, nodeType, currentDocument, newEvent, dispatchEvent)
 import Chili.TDVar (TDVar, readTDVar, cleanTDVar, isDirtyTDVar)
 import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
 
@@ -87,6 +87,9 @@ updateView loop model sendWS htmlV doc body view = do
 --                     debugPrint (oldHtml, newHtml, patches)
                      apply loop model sendWS htmlV doc body view body oldHtml patches
                      atomically $ putTMVar htmlV newHtml
+                     (Just node) <- getFirstChild body
+                     vdomEventObject <- newEvent Redrawn True True
+                     dispatchEvent node vdomEventObject
                      pure ()
 
 apply :: Loop

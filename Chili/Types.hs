@@ -1765,3 +1765,34 @@ newEvent ev bubbles cancelable =
      jsval <- js_newEvent evStr bubbles cancelable
      pure $ mkEvent ev jsval
 
+
+-- * VDOM Events
+
+data VDOMEvent
+     = Redrawn
+       deriving (Eq, Show)
+
+instance IsEvent VDOMEvent where
+  eventToJSString Redrawn = fromString "redrawn"
+
+newtype VDOMEventObject = VDOMEventObject { unVDOMEventObject :: JSVal }
+
+instance MkEvent VDOMEvent where
+  mkEvent _ jsval = VDOMEventObject jsval
+
+instance Show VDOMEventObject where
+  show _ = "VDOMEventObject"
+
+instance ToJSVal VDOMEventObject where
+  toJSVal = return . unVDOMEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal VDOMEventObject where
+  fromJSVal = return . fmap VDOMEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject VDOMEventObject where
+  asEventObject (VDOMEventObject jsval) = EventObject jsval
+
+type instance EventObjectOf VDOMEvent   = VDOMEventObject
+
