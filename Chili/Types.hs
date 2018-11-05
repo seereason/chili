@@ -663,6 +663,13 @@ data FocusEvent
   | Focus
   | FocusIn
   | FocusOut
+    deriving (Eq, Ord, Show, Read)
+
+instance IsEvent FocusEvent where
+  eventToJSString Blur     = JS.pack "blur"
+  eventToJSString Focus    = JS.pack "focus"
+  eventToJSString FocusIn  = JS.pack "focusin"
+  eventToJSString FocusOut = JS.pack "focusout"
 
 data FormEvent
   = Change
@@ -675,11 +682,7 @@ data FormEvent
   deriving (Eq, Ord, Show, Read)
 
 instance IsEvent FormEvent where
---  eventToJSString Blur     = JS.pack "blur"
   eventToJSString Change   = JS.pack "change"
---  eventToJSString Focus    = JS.pack "focus"
---  eventToJSString FocusIn  = JS.pack "focusin"
---  eventToJSString FocusOut = JS.pack "focusout"
   eventToJSString Input    = JS.pack "input"
   eventToJSString Invalid  = JS.pack "invalid"
   eventToJSString Reset    = JS.pack "reset"
@@ -959,6 +962,25 @@ instance HasModifierKeys KeyboardEventObject where
   altKey   = keyboard_altKey
   metaKey  = keyboard_metaKey
 
+-- * FocusEventObject
+
+newtype FocusEventObject = FocusEventObject { unFocusEventObject :: JSVal }
+
+instance Show FocusEventObject where
+  show _ = "FocusEventObject"
+
+instance ToJSVal FocusEventObject where
+  toJSVal = return . unFocusEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal FocusEventObject where
+  fromJSVal = return . fmap FocusEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject FocusEventObject where
+  asEventObject (FocusEventObject jsval) = EventObject jsval
+
+
 -- * ProgressEventObject
 
 newtype ProgressEventObject = ProgressEventObject { unProgressEventObject :: JSVal }
@@ -979,6 +1001,7 @@ type family EventObjectOf event :: *
 type instance EventObjectOf Event          = EventObject
 type instance EventObjectOf MouseEvent     = MouseEventObject
 type instance EventObjectOf KeyboardEvent  = KeyboardEventObject
+type instance EventObjectOf FocusEvent     = FocusEventObject
 type instance EventObjectOf FormEvent      = EventObject
 type instance EventObjectOf ProgressEvent  = ProgressEventObject
 type instance EventObjectOf ClipboardEvent = ClipboardEventObject
