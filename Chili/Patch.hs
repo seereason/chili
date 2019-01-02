@@ -7,6 +7,7 @@ import Control.Concurrent (forkIO)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TMVar (TMVar, putTMVar, takeTMVar)
 import Control.Monad (when)
+import Control.Monad.Fail (MonadFail)
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans (MonadIO(..))
 import Data.List (sort)
@@ -20,7 +21,7 @@ import Chili.Types (Control(..), Html(..), Attr(..), JSDocument, JSElement(..), 
 import Chili.TDVar (TDVar, readTDVar, cleanTDVar, isDirtyTDVar)
 import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
 
-renderHtml :: (MonadIO m) => Loop -> TDVar model -> (remote -> IO ()) -> TMVar (Html model) -> JSDocument -> JSNode -> Html model -> ((remote -> IO ()) -> model -> Html model) -> m (Maybe JSNode)
+renderHtml :: (MonadIO m, MonadFail m) => Loop -> TDVar model -> (remote -> IO ()) -> TMVar (Html model) -> JSDocument -> JSNode -> Html model -> ((remote -> IO ()) -> model -> Html model) -> m (Maybe JSNode)
 renderHtml loop model sendWS htmlV doc body (Cntl (Control cmodel cinit cview) eventType eventHandler) view =
   do (Just cBody) <- fmap toJSNode <$> createJSElement doc (Text.pack "span")
      tid <- liftIO $ forkIO (loop doc cBody cmodel cinit Nothing (\_ _ _ -> pure ()) cview >> pure ())
