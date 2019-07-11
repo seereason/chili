@@ -451,6 +451,7 @@ getFirstChild :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
 getFirstChild self
   = liftIO ((js_getFirstChild ((toJSNode self))) >>= fromJSVal)
 
+-- | remove all the children
 removeChildren
     :: (MonadIO m, IsJSNode self) =>
        self
@@ -577,6 +578,13 @@ foreign import javascript unsafe "$1[\"nodeValue\"]"
 nodeValue :: (MonadIO m) => JSNode -> m JSString
 nodeValue node = liftIO $ js_nodeValue node
 
+
+foreign import javascript unsafe "$1[\"setNodeValue\"] = $2"
+  js_setNodeValue :: JSNode -> JSString -> IO ()
+
+setNodeValue :: (MonadIO m) => JSNode -> JSString -> m ()
+setNodeValue node val = liftIO $ js_setNodeValue node val
+
 -- * Events
 
 newtype EventTarget = EventTarget { unEventTarget :: JSVal }
@@ -661,8 +669,8 @@ data FrameEvent
 data FocusEvent
   = Blur
   | Focus
-  | FocusIn
-  | FocusOut
+  | FocusIn  -- bubbles
+  | FocusOut -- bubbles
     deriving (Eq, Ord, Show, Read)
 
 instance IsEvent FocusEvent where
@@ -929,12 +937,14 @@ instance FromJSVal KeyboardEventObject where
 
 instance IsEventObject KeyboardEventObject where
   asEventObject (KeyboardEventObject jsval) = EventObject jsval
-  
 
 foreign import javascript unsafe "$1[\"charCode\"]" charCode ::
         KeyboardEventObject -> Int
 
 foreign import javascript unsafe "$1[\"keyCode\"]" keyCode ::
+        KeyboardEventObject -> Int
+
+foreign import javascript unsafe "$1[\"which\"]" which ::
         KeyboardEventObject -> Int
 
 

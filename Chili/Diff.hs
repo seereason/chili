@@ -29,6 +29,7 @@ diff a b = Map.fromListWith (flip (++)) (walk a b 0)
 
 -- FIXME: does not handle changes to Events or Properties
 -- FIXME: we should be able to add and remove single attributes
+-- FIXME: does not handle removed elements
 diffAttrs :: [Attr model] -> [Attr model] -> Int -> [(Int, [Patch model])]
 diffAttrs attrsA attrsB index =
           let attrsA' = [(k,v) | Attr k v <- attrsA]

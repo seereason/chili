@@ -35,7 +35,11 @@ library
                   Chili.Types
                   Chili.Loop
                   Chili.Internal
-
+                  Dominator
+                  Dominator.Diff
+                  Dominator.Patch
+                  Dominator.HSX
+                  Dominator.Types
 
 Test-suite spec
   main-is:             Spec.hs

@@ -1,3 +1,13 @@
 *~
 *.js_*
 dist
+*.jsexe
+*.o
+*.dyn_o
+*.hi
+*.dyn_hi
+.gcroots
+cabal.sandbox.config
+result
+.cabal-sandbox
+
