@@ -708,6 +708,15 @@ data DragEvent
   | Drop
   deriving (Eq, Ord, Show, Read)
 
+instance IsEvent DragEvent where
+  eventToJSString Drag = JS.pack "drag"
+  eventToJSString DragEnd = JS.pack "dragend"
+  eventToJSString DragEnter = JS.pack "dragenter"
+  eventToJSString DragLeave = JS.pack "dragleave"
+  eventToJSString DragOver = JS.pack "dragover"
+  eventToJSString DragStart = JS.pack "dragstart"
+  eventToJSString Drop = JS.pack "drop"
+
 data PrintEvent
   = AfterPrint
   | BeforePrint
