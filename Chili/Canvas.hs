@@ -301,7 +301,7 @@ drawCanvas (Canvas cid content) =
                                   case (JS.unpack s) of
                                     "true" -> pure True
                                     _ -> pure False
-           ratio <- fmap (fromMaybe 1) (devicePixelRatio =<< window)
+           ratio <- fmap (fromMaybe 1) (devicePixelRatio . fromJust =<< window)
            (w, h) <-
               if rescaleCanvas
                  then do (Just oldWidth)  <- fmap (read . JS.unpack) <$> getAttribute canvasElem (JS.pack "width")

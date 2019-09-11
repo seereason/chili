@@ -87,6 +87,13 @@ class IsJSNode obj where
 instance IsJSNode JSNode where
     toJSNode = id
 
+-- * IsEventTarget
+
+class IsEventTarget o where
+    toEventTarget :: o -> EventTarget
+--    toEventTarget = EventTarget
+
+
 -- * JSNodeList
 
 newtype JSNodeList = JSNodeList JSVal
@@ -175,31 +182,54 @@ newtype JSDocument = JSDocument JSVal
 unJSDocument (JSDocument o) = o
 
 instance ToJSVal JSDocument where
-  toJSVal = return . unJSDocument
+  toJSVal = pure . unJSDocument
   {-# INLINE toJSVal #-}
 
 instance FromJSVal JSDocument where
-  fromJSVal = return . fmap JSDocument . maybeJSNullOrUndefined
+  fromJSVal = pure . fmap JSDocument . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
 instance IsJSNode JSDocument where
     toJSNode = JSNode . unJSDocument
 
-foreign import javascript unsafe "new window[\"Document\"]()"
-        js_newDocument :: IO JSDocument
-
 instance IsEventTarget JSDocument where
     toEventTarget = EventTarget . unJSDocument
+
+foreign import javascript unsafe "new window[\"Document\"]()"
+        js_newDocument :: IO JSDocument
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Document Mozilla Document documentation>
 newJSDocument :: (MonadIO m) => m JSDocument
 newJSDocument = liftIO js_newDocument
 
-foreign import javascript unsafe "$r = document"
-  ghcjs_currentDocument :: IO JSDocument
+foreign import javascript unsafe "$1[\"implementation\"][\"createHTMLDocument\"]()"
+       js_createHTMLDocument :: JSDocument -> IO JSDocument
 
-currentDocument :: IO (Maybe JSDocument)
-currentDocument = Just <$> ghcjs_currentDocument
+-- foreign import javascript unsafe "document.implementation.createHTMLDocument()"
+--        js_createHTMLDocument :: JSDocument -> IO JSDocument
+
+-- | FIXME: actually use title when provided
+createHTMLDocument :: JSDocument -> Maybe JSString -> IO JSDocument
+createHTMLDocument d mTitle =
+  js_createHTMLDocument d
+
+foreign import javascript unsafe "$r = (typeof document === 'undefined') ? null : document"
+  ghcjs_currentDocument :: IO JSVal
+
+currentDocument :: (MonadIO m) => m (Maybe JSDocument)
+currentDocument = liftIO $ fromJSVal =<< ghcjs_currentDocument
+
+foreign import javascript unsafe "document = $1"
+   js_setCurrentDocument :: JSDocument -> IO ()
+
+setCurrentDocument :: (MonadIO m) => JSDocument -> m ()
+setCurrentDocument doc = liftIO $ js_setCurrentDocument doc
+
+foreign import javascript unsafe "$r = $1[\"document\"]"
+        js_document :: JSWindow -> IO JSVal
+
+document :: (MonadIO m) => JSWindow -> m (Maybe JSDocument)
+document w = liftIO $ fromJSVal =<< js_document w
 
 -- * JSWindow
 
@@ -213,14 +243,20 @@ instance FromJSVal JSWindow where
   fromJSVal = return . fmap JSWindow . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
-foreign import javascript unsafe "$r = window"
-  js_window :: IO JSWindow
-
 instance IsEventTarget JSWindow where
     toEventTarget = EventTarget . unJSWindow
 
-window :: (MonadIO m) => m JSWindow
-window = liftIO js_window
+foreign import javascript unsafe "$r = (typeof window === 'undefined') ? null : window"
+  js_window :: IO JSVal
+
+window :: (MonadIO m) => m (Maybe JSWindow)
+window = liftIO $ fromJSVal =<< js_window
+
+foreign import javascript unsafe "window = $1"
+   js_setWindow :: JSWindow -> IO ()
+
+setWindow :: (MonadIO m) => JSWindow -> m ()
+setWindow w = liftIO $ js_setWindow w
 
 foreign import javascript unsafe "$1[\"devicePixelRatio\"]"
   js_devicePixelRatio :: JSWindow -> IO JSVal
@@ -233,7 +269,6 @@ foreign import javascript unsafe "$1[\"getSelection\"]()"
 
 getSelection :: (MonadIO m) => JSWindow -> m Selection
 getSelection w = liftIO (js_getSelection w)
-
 
 -- * JSElement
 
@@ -287,9 +322,7 @@ foreign import javascript unsafe "$1[\"createElement\"]($2)"
         JSDocument -> JSString -> IO JSElement
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/JSDocument.createJSElement Mozilla JSDocument.createJSElement documentation>
-createJSElement ::
-              (MonadIO m) =>
-                JSDocument -> Text -> m (Maybe JSElement)
+createJSElement :: (MonadIO m) => JSDocument -> Text -> m (Maybe JSElement)
 createJSElement document tagName
   = liftIO ((js_createJSElement document (textToJSString tagName))
             >>= return . Just)
@@ -464,6 +497,17 @@ removeChildren self =
              do removeChild self mc
                 removeChildren self
 
+-- * nextSibling
+
+foreign import javascript unsafe "$1[\"nextSibling\"]"
+        js_nextSibling :: JSNode -> IO JSVal
+
+-- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.nextSibling Mozilla Node.nextSibling documentation>
+nextSibling :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
+nextSibling self
+  = liftIO ((js_nextSibling ((toJSNode self))) >>= fromJSVal)
+
+
 foreign import javascript unsafe "$1[\"setAttribute\"]($2, $3)"
         js_setAttribute :: JSElement -> JSString -> JSString -> IO ()
 
@@ -486,19 +530,30 @@ getAttribute :: (MonadIO m) =>
              -> m (Maybe JSString)
 getAttribute self name = liftIO (js_getAttribute self name >>= fromJSVal)
 
+foreign import javascript unsafe "$1[\"removeAttribute\"]($2)"
+        js_removeAttribute :: JSElement -> JSString -> IO ()
+
+-- | <https://developer.mozilla.org/en-US/docs/Web/API/Element.removeAttribute Mozilla Element.removeAttribute documentation>
+removeAttribute :: (MonadIO m) =>
+                JSElement -> Text -> m ()
+removeAttribute self name = liftIO (js_removeAttribute self (textToJSString name))
+
 foreign import javascript unsafe "$1[\"style\"][$2] = $3"
         setStyle :: JSElement -> JSString -> JSString -> IO ()
 
 foreign import javascript unsafe "$1[$2] = $3"
         js_setProperty :: JSElement -> JSString -> JSString -> IO ()
 
--- | <https://developer.mozilla.org/en-US/docs/Web/API/Element.setAttribute Mozilla Element.setAttribute documentation>
-setProperty ::
-             (MonadIO m) =>
-               JSElement -> Text -> Text -> m ()
+setProperty :: (MonadIO m) => JSElement -> Text -> Text -> m ()
 setProperty self name value
   = liftIO
       (js_setProperty self (textToJSString name) (textToJSString value))
+
+foreign import javascript unsafe "delete $1[$2]"
+    js_delete :: JSVal -> JSString -> IO ()
+
+deleteProperty :: (MonadIO m) => JSElement -> Text -> m ()
+deleteProperty e n = liftIO (js_delete (unJSElement e) (textToJSString n))
 
 {-
 setCSS :: (MonadIO m) =>
@@ -557,15 +612,21 @@ instance FromJSVal JSTextNode where
 instance IsJSNode JSTextNode where
     toJSNode = JSNode . unJSTextNode
 
+-- * isEqualNode
+
+foreign import javascript unsafe "$1[\"isEqualNode\"]($2)"
+  js_isEqualNode :: JSNode -> JSNode -> IO Bool
+
+isEqualNode :: (MonadIO m) => (IsJSNode obj1, IsJSNode obj2) => obj1 -> obj2 -> m Bool
+isEqualNode obj1 obj2 = liftIO $ js_isEqualNode (toJSNode obj1) (toJSNode obj2)
+
 -- * createTextNode
 
 foreign import javascript unsafe "$1[\"createTextNode\"]($2)"
         js_createTextNode :: JSDocument -> JSString -> IO JSTextNode
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Document.createTextNode Mozilla Document.createTextNode documentation>
-createJSTextNode ::
-               (MonadIO m) =>
-                 JSDocument -> Text -> m (Maybe JSTextNode)
+createJSTextNode :: (MonadIO m) => JSDocument -> Text -> m (Maybe JSTextNode)
 createJSTextNode document data'
   = liftIO
       ((js_createTextNode document
@@ -579,7 +640,7 @@ nodeValue :: (MonadIO m) => JSNode -> m JSString
 nodeValue node = liftIO $ js_nodeValue node
 
 
-foreign import javascript unsafe "$1[\"setNodeValue\"] = $2"
+foreign import javascript unsafe "$1[\"nodeValue\"] = $2"
   js_setNodeValue :: JSNode -> JSString -> IO ()
 
 setNodeValue :: (MonadIO m) => JSNode -> JSString -> m ()
@@ -599,10 +660,6 @@ instance ToJSVal EventTarget where
 instance FromJSVal EventTarget where
   fromJSVal = return . fmap EventTarget . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
-
-class IsEventTarget o where
-    toEventTarget :: o -> EventTarget
---    toEventTarget = EventTarget
 
 instance IsEventTarget JSElement where
     toEventTarget = EventTarget . unJSElement
@@ -1829,3 +1886,29 @@ instance IsEventObject VDOMEventObject where
 
 type instance EventObjectOf VDOMEvent   = VDOMEventObject
 
+-- * JSDom
+
+newtype JSDOM = JSDOM JSVal
+
+unJSDOM (JSDOM o) = o
+
+instance ToJSVal JSDOM where
+  toJSVal = pure . unJSDOM
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal JSDOM where
+  fromJSVal = pure . fmap JSDOM . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+
+foreign import javascript unsafe "require('jsdom')"
+   js_requireJSDOM :: IO JSVal
+
+requireJSDOM :: (MonadIO m) => m (Maybe JSDOM)
+requireJSDOM = liftIO $ fromJSVal =<< js_requireJSDOM
+
+foreign import javascript unsafe "new $1.JSDOM($2).window"
+   js_newJSDOM :: JSDOM -> JSString -> IO JSVal
+
+newJSDOM :: (MonadIO m) => JSDOM -> JSString -> m (Maybe JSWindow)
+newJSDOM jsdom html = liftIO $ fromJSVal =<< js_newJSDOM jsdom html
