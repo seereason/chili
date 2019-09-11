@@ -1,10 +1,37 @@
 {-# language GADTs #-}
 {-# language FlexibleContexts #-}
-module Dominator.Types where
+module Dominator.Types
+       ( Html(..)
+       , Attr(..)
+       , JSDocument
+       , JSElement
+       , JSNode
+       , MouseEvent(..)
+       , MouseEventObject(..)
+       , addEventListener
+       , currentDocument
+       , debugStrLn
+       , flattenCData
+       , descendants
+       , DHandle(..)
+       , appendChild
+       , createJSTextNode
+       , createJSElement
+       , getAttribute
+       , getFirstChild
+       , isEqualNode
+       , nextSibling
+       , removeChildren
+       , setAttribute
+       , setProperty
+       , setNodeValue
+       , target
+       , toJSNode
+       ) where
 
 import Control.Concurrent.MVar (MVar)
 import Control.Monad.Trans (MonadIO(liftIO))
-import Chili.Types (EventObjectOf, IsEvent, IsJSNode(toJSNode), JSDocument, JSElement, JSTextNode, JSNode)
+import Chili.Types (EventObjectOf, IsEvent, IsJSNode(toJSNode), JSDocument, JSElement, JSTextNode, JSNode, MouseEvent(..), MouseEventObject(..), addEventListener, currentDocument, target, getAttribute, getFirstChild, isEqualNode, nextSibling, removeChildren, setAttribute, setProperty, setNodeValue)
 import Data.JSString (JSString)
 import qualified Data.JSString as JS
 import Data.JSString.Text (textToJSString, textFromJSString)
@@ -13,7 +40,8 @@ import qualified Data.Text as Text
 import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
 
 debugStrLn :: String -> IO ()
-debugStrLn = const $ pure () -- putStrLn
+debugStrLn = const $ pure ()
+-- debugStrLn = putStrLn
 
 data Attr where
   Attr     :: Text -> Text -> Attr
@@ -54,9 +82,6 @@ data DHandle =
           , vdom :: MVar Html
           , doc  :: JSDocument
           }
-
-
-
 
 -- * appendChild
 
