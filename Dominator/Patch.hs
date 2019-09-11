@@ -8,7 +8,7 @@ import Control.Concurrent.MVar (takeMVar, putMVar)
 import Control.Monad (when)
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans (MonadIO(..))
-import Chili.Types (JSDocument, JSElement(..), JSNode, unJSNode, addEventListener, currentDocument, childNodes, getFirstChild, getLength, parentNode, nodeType, item, toJSNode, removeChild, replaceData, replaceChild, setAttribute, setProperty)
+import Chili.Types (JSDocument, JSElement(..), JSNode, unJSNode, addEventListener, currentDocument, childNodes, deleteProperty, getFirstChild, getLength, parentNode, nodeType, item, toJSNode, removeAttribute, removeChild, replaceData, replaceChild, setAttribute, setProperty)
 import Data.List (sort)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -100,18 +100,21 @@ apply'' document body node patch =
                                        replaceChild parent newChild node
                                        return ()
 
-      (Props newProps) -> -- FIXME: doesn't handle changes to events.
+      (Props newProps removeAttrs removeProps) -> -- FIXME: doesn't handle changes to events.
           do let e = JSElement $ unJSNode node
              debugStrLn $ "set Attr: " ++ show [ (k,v) | Attr k v <- newProps ]
              debugStrLn $ "set Prop: " ++ show [ (k,v) | Prop k v <- newProps ]
              mapM_ (\(k, v) ->
                         case (unpack k) of
 --                          "value" -> setValue e v -- FIXME: this causes issues with the cursor position
-                          _ -> do setAttribute e k v) [ (k,v) | Attr k v <- newProps ]
+                          _ -> do debugStrLn $ "setAttribute " ++ show (k,v)
+                                  setAttribute e k v) [ (k,v) | Attr k v <- newProps ]
              mapM_ (\(k, v) ->
                         case (unpack k) of
 --                          "value" -> setValue e v -- FIXME: this causes issues with the cursor position
                           _ -> setProperty e k v) [ (k,v) | Prop k v <- newProps ]
+             mapM_ (\k -> removeAttribute e k) removeAttrs
+             mapM_ (\k -> deleteProperty e k)  removeProps
 
       (Insert elem) ->
           -- FIXME: don't get parent?
