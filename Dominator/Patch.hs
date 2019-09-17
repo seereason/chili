@@ -8,13 +8,13 @@ import Control.Concurrent.MVar (takeMVar, putMVar)
 import Control.Monad (when)
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans (MonadIO(..))
-import Chili.Types (JSDocument, JSElement(..), JSNode, unJSNode, addEventListener, currentDocument, childNodes, deleteProperty, getFirstChild, getLength, parentNode, nodeType, item, toJSNode, removeAttribute, removeChild, replaceData, replaceChild, setAttribute, setProperty)
+import Chili.Types (JSDocument, JSElement(..), JSNode, JSNodeList, unJSNode, addEventListener, currentDocument, childNodes, deleteProperty, getFirstChild, getLength, item, parentNode, nodeType, item, toJSNode, removeAttribute, removeChild, replaceData, replaceChild, setAttribute, setProperty, insertBefore)
 import Data.List (sort)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Text (unpack)
+import Data.Text (Text, unpack)
 import qualified Data.Text as Text
-import Dominator.Diff (Patch(..), diff)
+import Dominator.Diff (Move(..), Moves, Patch(..), diff)
 import Dominator.Types (DHandle(..), Html(..), Attr(..), appendChild, createJSElement, createJSTextNode, descendants, debugStrLn)
 {-
 import Chili.Internal (debugStrLn, debugPrint)
@@ -27,7 +27,7 @@ import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCall
 renderHtml :: JSDocument -> Html -> IO JSNode
 renderHtml doc (CData t) =
   toJSNode <$> createJSTextNode doc t
-renderHtml doc (Element tag attrs children) =
+renderHtml doc (Element tag mKey attrs children) =
   do e <- createJSElement doc tag
      mapM_ (\c -> appendChild e =<< renderHtml doc c) children
      mapM_ (doAttr e) attrs
@@ -146,7 +146,44 @@ apply'' document body node patch =
                       newChild <- renderHtml document newElem
                       replaceChild parent newChild node
                       return ()
+      Reorder moves ->
+        do debugStrLn $ "Reorder: " ++ show moves
+           cs <- childNodes node
+           l <- getLength cs
+           debugStrLn $ "Reorder: " ++ show moves
+           -- we need to remove from the end of the list to the beginning or the indexes
+           -- will shift as you remove things
+           let removes = reverse $ sort $ [ RemoveKey i mKey| RemoveKey i mKey <- moves ]
+               inserts = [ InsertKey i key | InsertKey i key <- moves ]
+           keyMap <- applyRemoves node cs Map.empty removes
+           applyInserts node cs keyMap inserts
+           pure ()
 
+applyRemoves :: JSNode -> JSNodeList -> Map Text JSNode -> Moves -> IO (Map Text JSNode)
+applyRemoves parent children keyMap [] = pure keyMap
+applyRemoves parent children keyMap (move:moves) =
+  case move of
+    (RemoveKey i mKey) ->
+      do (Just child) <- item children (fromIntegral i)
+         let keyMap' = case mKey of
+               Nothing -> keyMap
+               (Just key) -> Map.insert key child keyMap
+         l <- getLength  children
+         debugStrLn ("remove " ++ show i ++ " from list of length " ++ show l)
+         removeChild parent (Just child)
+         applyRemoves parent children keyMap' moves
+
+applyInserts :: JSNode -> JSNodeList -> Map Text JSNode -> Moves -> IO ()
+applyInserts parent children keyMap [] = pure ()
+applyInserts parent children keyMap (move:moves) =
+  case move of
+    (InsertKey i key) ->
+      case Map.lookup key keyMap of
+        Nothing -> error $  "applyInserts: missing key - " ++ Text.unpack key
+        (Just n) ->
+          do (Just before) <- item children (fromIntegral i)
+             insertBefore parent n before
+             applyInserts parent children keyMap moves
 
 getNodes :: JSNode      -- ^ root node of DOM
          -> Html -- ^ virtual DOM that matches the current DOM
@@ -183,7 +220,7 @@ getNodes currNode vdom nodeIndices = do
                   | otherwise ->
                      return []
 
-      getNodes' currNode vdom@(Element _tag _attrs children) is'' =
+      getNodes' currNode vdom@(Element _tag _key _attrs children) is'' =
           do liftIO $ debugStrLn $ "getNodes _tag = " ++ show _tag ++ " is'' = " ++ show is''
              let count = descendants children
              index <- get

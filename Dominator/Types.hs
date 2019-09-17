@@ -56,11 +56,11 @@ instance Show Attr where
   show (EL e _) = "on" ++ show e
 
 data Html where
-  Element :: Text -> [Attr] -> [Html] -> Html
+  Element :: Text -> Maybe Text -> [Attr] -> [Html] -> Html
   CData   :: Text -> Html
 
 instance Show Html where
-  show (Element n attrs elems) = "Element " <> Text.unpack n <> " " <> show attrs <> " " <> show elems
+  show (Element n mKey attrs elems) = "Element " <> Text.unpack n <> " " <> (case mKey of Nothing -> "" ; Just k -> "{ key = " <> Text.unpack k <> " } ") <> show attrs <> " " <> show elems
   show (CData t) = "CData " <> Text.unpack t
 --   show (Cntl _ e _) = "Cntl " ++ show e
 
@@ -74,7 +74,7 @@ flattenCData (h : t) = h : flattenCData t
 flattenCData [] = []
 
 descendants :: [Html] -> Int
-descendants elems = sum [ descendants children | Element _n _attrs children <- elems] + (length elems)
+descendants elems = sum [ descendants children | Element _n _key _attrs children <- elems] + (length elems)
 
 
 data DHandle =
