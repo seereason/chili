@@ -2,7 +2,7 @@
 {-# language FlexibleContexts #-}
 module Dominator where
 
-import Chili.Types (EventObjectOf(..), IsEvent(..), IsJSNode(toJSNode), JSDocument, JSElement, JSTextNode, JSNode, addEventListener, currentDocument, getElementById, removeChildren, setAttribute, setProperty)
+import Chili.Types (EventObjectOf(..), IsEvent(..), IsJSNode(toJSNode), JSDocument, JSElement(..), JSTextNode, JSNode, addEventListener, currentDocument, getElementById, getElementsByTagName, getLength, item, removeChildren, setAttribute, setProperty, unJSNode)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar)
 import Control.Monad.Trans (MonadIO(liftIO))
 import Data.JSString (JSString)
@@ -42,6 +42,19 @@ attachById elemId =
                                   , doc = d
                                   }
 
+-- | attach to the first tag with the name.. ideally something unique like '\<body\>'
+attachByTagName :: JSDocument -> JSString -> IO (Maybe DHandle)
+attachByTagName d tagName =
+  do (Just elems) <- getElementsByTagName d tagName
+     l <- getLength elems
+     case l of
+       0 -> pure Nothing
+       _ -> do (Just e) <- item elems 0
+               mvdom <- newEmptyMVar
+               pure $ Just $ DHandle { root = JSElement (unJSNode e)
+                                     , vdom = mvdom
+                                     , doc = d
+                                     }
 
 initView :: DHandle -> Html -> IO ()
 initView (DHandle root vdom doc) html =

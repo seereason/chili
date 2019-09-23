@@ -1,0 +1,21 @@
+{
+  "name": "dominator",
+  "version": "1.0.0",
+  "description": "dominator tests",
+  "main": "diff.test.js",
+  "keywords": [
+    "dominator"
+  ],
+  "author": "stepcut",
+  "license": "BSD-3-Clause",
+  "jest": {
+    "verbose": true,
+    "testURL": "http://localhost/"
+  },
+  "devDependencies": {
+    "jsdom": "*",
+    "jsverify": "*",
+    "underscore": "*",
+    "jest": "*"
+  }
+}
