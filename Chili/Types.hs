@@ -1,4 +1,4 @@
-{-# LANGUAGE ConstrainedClassMethods, ExistentialQuantification, FlexibleContexts, FlexibleInstances, GADTs, JavaScriptFFI, ScopedTypeVariables, TemplateHaskell, TypeFamilies #-}
+{-# LANGUAGE ConstrainedClassMethods, ExistentialQuantification, FlexibleContexts, FlexibleInstances, GADTs, JavaScriptFFI, ScopedTypeVariables, TypeFamilies #-}
 {-# language GeneralizedNewtypeDeriving #-}
 {-# language RankNTypes #-}
 module Chili.Types where
@@ -18,6 +18,7 @@ import Control.Concurrent.STM.TMVar (TMVar, putTMVar, takeTMVar)
 import Data.Aeson (FromJSON, ToJSON, decodeStrict, encode)
 import qualified Data.ByteString.Lazy.Char8 as C
 import Data.Aeson.Types (Parser, Result(..), parse)
+import Data.Char as Char (toLower)
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Monoid ((<>))
 import Data.String (fromString)
@@ -628,7 +629,7 @@ data MouseEvent
   | MouseOver
   | MouseOut
   | MouseUp
-    deriving (Eq, Ord, Show, Read)
+    deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 instance IsEvent MouseEvent where
   eventToJSString Click       = JS.pack "click"
@@ -646,7 +647,7 @@ data KeyboardEvent
   = KeyDown
   | KeyPress
   | KeyUp
-    deriving (Eq, Ord, Show, Read)
+    deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 instance IsEvent KeyboardEvent where
   eventToJSString KeyDown  = JS.pack "keydown"
@@ -664,14 +665,17 @@ data FrameEvent
   | Resize
   | Scroll
   | Unload
-    deriving (Eq, Ord, Show, Read)
+    deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+instance IsEvent FrameEvent where
+  eventToJSString = JS.pack . map Char.toLower . show
 
 data FocusEvent
   = Blur
   | Focus
   | FocusIn  -- bubbles
   | FocusOut -- bubbles
-    deriving (Eq, Ord, Show, Read)
+    deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 instance IsEvent FocusEvent where
   eventToJSString Blur     = JS.pack "blur"
@@ -687,7 +691,7 @@ data FormEvent
 --  | Search
 --  | Select
   | Submit
-  deriving (Eq, Ord, Show, Read)
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 instance IsEvent FormEvent where
   eventToJSString Change   = JS.pack "change"
@@ -706,7 +710,7 @@ data DragEvent
   | DragOver
   | DragStart
   | Drop
-  deriving (Eq, Ord, Show, Read)
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 instance IsEvent DragEvent where
   eventToJSString Drag = JS.pack "drag"
@@ -720,7 +724,7 @@ instance IsEvent DragEvent where
 data PrintEvent
   = AfterPrint
   | BeforePrint
-  deriving (Eq, Ord, Show, Read)
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 data MediaEvent
   = CanPlay
@@ -742,7 +746,7 @@ data MediaEvent
   | TimeUpdate
   | VolumeChange
   | Waiting
-  deriving (Eq, Ord, Show, Read)
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 data ProgressEvent
   = LoadStart
@@ -752,7 +756,7 @@ data ProgressEvent
   | ProgressLoad
   | Timeout
   | LoadEnd
-  deriving (Eq, Ord, Show, Read)
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 instance IsEvent ProgressEvent where
   eventToJSString LoadStart     = JS.pack "loadstart"
@@ -767,17 +771,17 @@ data AnimationEvent
   = AnimationEnd
   | AnimationInteration
   | AnimationStart
-  deriving (Eq, Ord, Show, Read)
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 data TransitionEvent
   = TransitionEnd
-  deriving (Eq, Ord, Show, Read)
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 data ServerSentEvent
   = ServerError
   | ServerMessage
   | Open
-    deriving (Eq, Ord, Show, Read)
+    deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 data MiscEvent
   = MiscMessage
@@ -788,7 +792,7 @@ data MiscEvent
   | Storage
   | Toggle
   | Wheel
-  deriving (Eq, Ord, Show, Read)
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 data TouchEvent
   = TouchCancel
@@ -800,7 +804,7 @@ data TouchEvent
 data SelectionEvent
   = SelectionStart
   | SelectionChange
-  deriving (Eq, Ord, Show, Read)
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 instance IsEvent SelectionEvent where
   eventToJSString SelectionStart  = JS.pack "selectionstart"
@@ -825,7 +829,6 @@ data EventType
   | TouchEvent TouchEvent
   | SelectionEvent SelectionEvent
   deriving (Eq, Ord, Show, Read)
-
 -- * Event Objects
 
 -- http://www.w3schools.com/jsref/dom_obj_event.asp
@@ -1025,6 +1028,7 @@ type instance EventObjectOf FormEvent      = EventObject
 type instance EventObjectOf ProgressEvent  = ProgressEventObject
 type instance EventObjectOf ClipboardEvent = ClipboardEventObject
 type instance EventObjectOf SelectionEvent = SelectionEventObject
+type instance EventObjectOf DragEvent      = DragEventObject
 
 -- * DOMRect
 
@@ -1389,6 +1393,24 @@ initRemoteWS url' onMessageHandler =
                                       }
        ws <- WebSockets.connect request
        pure (sendRemoteWS ws)
+
+-- * DragEventObject
+
+newtype DragEventObject = DragEventObject { unDragEventObject :: JSVal }
+
+instance Show DragEventObject where
+  show _ = "DragEventObject"
+
+instance ToJSVal DragEventObject where
+  toJSVal = return . unDragEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal DragEventObject where
+  fromJSVal = return . fmap DragEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject DragEventObject where
+  asEventObject (DragEventObject jsval) = EventObject jsval
 
 -- * SelectionEventObject
 
@@ -1765,7 +1787,7 @@ data ClipboardEvent
   = Copy
   | Cut
   | Paste
-    deriving (Eq, Ord, Show, Read)
+    deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 instance IsEvent ClipboardEvent where
   eventToJSString Copy  = JS.pack "copy"
