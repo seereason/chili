@@ -51,7 +51,9 @@ renderHtml loop model sendWS htmlV doc body (Element tag attrs children) view =
         addEventListener elem eventType (\e -> {- putStrLn "eventHandler start" >> -} (handleAndUpdate eventHandler e model) {- >> putStrLn "eventHandler end"-}) False
 
       handleAndUpdate eventHandler e model =
-        do eventHandler e model
+        do -- putStrLn "before eventHandler"
+           eventHandler e model
+           -- putStrLn "after eventHandler"
            updateView loop model sendWS htmlV doc body view
 {-
            dirty <- atomically $ isDirtyTDVar model
@@ -110,6 +112,7 @@ apply loop model sendWS htmlV document body view rootNode vdom patches =
         [] -> pure rootNode
         _ -> do -- debugStrLn $ "indices (keys) = " ++ show indices
                 -- debugStrLn $ "apply = " ++ show patches
+                -- putStrLn $ "apply = " ++ show patches
                 (Just first) <- getFirstChild rootNode -- FIXME: handle Nothing
                 nodeList <- getNodes first vdom indices
                 -- debugStrLn $ "nodeList length = " ++ show (length nodeList)

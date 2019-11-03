@@ -390,6 +390,20 @@ getElementById ::
 getElementById self ident =
   liftIO (nullableToMaybe <$> js_getElementsById self ident)
 
+-- * insertBefore
+
+-- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.insertBefore Mozilla Node.insertBefore documentation>
+
+foreign import javascript unsafe "$1[\"insertBefore\"]($2, $3)"
+        js_insertBefore :: JSNode -> JSNode -> JSNode -> IO JSNode
+
+insertBefore :: (MonadIO m, IsJSNode parentNode, IsJSNode newNode, IsJSNode referenceNode) =>
+               parentNode
+             -> newNode
+            -> referenceNode
+            -> m JSNode
+insertBefore parentNode newNode referenceNode =
+  liftIO $ (js_insertBefore (toJSNode parentNode) (toJSNode newNode) (toJSNode referenceNode))
 
 -- * appendChild
 

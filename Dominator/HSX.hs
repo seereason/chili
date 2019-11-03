@@ -15,7 +15,7 @@ default (Text)
 
 genElement (d, t) a c =
     let c' = (concat c)
-    in Element t a (flattenCData c')
+    in Element t Nothing a (flattenCData c')
 
 genEElement (d, t) a = genElement (d, t) a []
 

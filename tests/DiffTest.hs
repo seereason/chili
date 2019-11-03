@@ -13,6 +13,7 @@ import Data.Text (Text)
 import Data.Maybe (catMaybes)
 
 import Dominator
+import Dominator.Diff
 import Dominator.Patch
 import Dominator.Types (Attr(..), Html(..), isEqualNode)
 import Dominator.HSX
@@ -35,7 +36,7 @@ html =
      [ (4, do c     <- Gen.list (Range.linear 1 4) html
               tag   <- Gen.element [ "div", "span", "p"]
               attrs <- genAttrs
-              pure $ Element tag attrs c)
+              pure $ Element tag Nothing attrs c)
      ]
   where
     genAttrs :: (MonadGen m) => m [Attr]
@@ -153,13 +154,65 @@ prop_diffPatch' orig new =
                                     same <- isEqualNode origE newE
 --                                    print h_new
                                     if same
-                                      then success
+                                      then do success
                                       else do annotate $ "orig: " ++ show orig
                                               annotate $ "new: " ++ show new
                                               annotate $ "orig DOM: " ++ show h_orig
                                               annotate $ "new DOM: " ++ show h_new
                                               failure
 
+
+reorder_1 :: Property
+reorder_1 =
+  withTests 1 $ property $ test $
+    do let htmlA = [ Element "div" (Just "1") [] [ CData "1" ]
+                   , Element "div" (Just "2") [] [ CData "2" ]
+                   , Element "div" (Just "3") [] [ CData "3" ]
+                   ]
+           htmlB = [ Element "div" (Just "3") [] [ CData "3" ]
+                   , Element "div" (Just "2") [] [ CData "2" ]
+                   , Element "div" (Just "1") [] [ CData "1" ]
+                   ]
+       case reorder htmlA htmlB of
+         (newChildren, moves)
+           | compareHtml htmlA newChildren && (moves == [RemoveKey 0 (Just "1"),InsertKey 0 "3",RemoveKey 2 (Just "3"),InsertKey 2 "1"]) ->
+               do success
+           | otherwise ->
+              do annotate (show moves)
+                 failure
+
+prop_keys_1 :: Property
+prop_keys_1 =
+  let htmlA = Element "div" Nothing []
+                [ Element "div" (Just "1") [] [CData "1" ]
+                , Element "div" (Just "2") [] [CData "2" ]
+                , Element "div" (Just "3") [] [CData "3" ]
+                ]
+      htmlB = Element "div" Nothing []
+               [ Element "div" (Just "3") [] [CData "3" ]
+               , Element "div" (Just "2") [] [CData "2" ]
+               , Element "div" (Just "1") [] [CData "1" ]
+               ]
+  in
+      prop_diffPatch htmlA htmlB
+
+compareHtml :: [Html] -> [Html] -> Bool
+compareHtml [] [] = True
+compareHtml ((CData t1):a) ((CData t2):b) = (t1 == t2) && compareHtml a b
+compareHtml ((Element t1 k1 a1 c1):a) ((Element t2 k2 a2 c2):b) =
+      (t1 == t2) &&
+      (k1 == k2) &&
+      (compareAttrs a1 a2) &&
+      (compareHtml c1 c2) && (compareHtml a b)
+compareHtml _ _ = False
+
+compareAttrs :: [Attr] -> [Attr] -> Bool
+compareAttrs [] [] = True
+compareAttrs ((Attr k1 v1):as) ((Attr k2 v2):bs) =
+      (k1 == k2) && (v1 == v2) && compareAttrs as bs
+compareAttrs ((Prop k1 v1):as) ((Prop k2 v2):bs) =
+      (k1 == k2) && (v1 == v2) && compareAttrs as bs
+compareAttrs _ _ = False
 
 prop_domTest :: Property
 prop_domTest =
@@ -170,13 +223,17 @@ prop_domTest =
 tests :: IO Bool
 tests =
   checkSequential $ Group "Dominator Diff/Patch"
-        [ ("prop_DiffPatch - change text in paragraph", prop_diffPatch [hsx| <p>hello world</p> |] [hsx| <p>goodbye world</p> |])
+        [ -- ("reorder_1", reorder_1)
+          ("prop_keys_1 - reorder with keys", prop_keys_1)
+{-
+        , ("prop_DiffPatch - change text in paragraph", prop_diffPatch [hsx| <p>hello world</p> |] [hsx| <p>goodbye world</p> |])
         , ("prop_DiffPatch - change 'class' attribute", prop_diffPatch [hsx| <p class="hello">hello world</p> |] [hsx| <p class="goodbye">goodbye world</p> |])
         , ("prop_DiffPatch - delete 'class' attribute", prop_diffPatch [hsx| <p class="hello">hello world</p> |] [hsx| <p>goodbye world</p> |])
         , ("prop_DiffPatch - mix it up 1", prop_diffPatch [hsx| <div><p>a</p><p>b</p><p>c</p></div> |] [hsx| <div><p>c</p><p>b</p><p>a</p></div> |])
         , ("prop_DiffPatch - mix it up 2", prop_diffPatch [hsx| <div><p>a</p><p>b</p><p>c</p></div> |] [hsx| <div><p>a</p><p>c</p><p>b</p></div> |])
         , ("prop_DiffPatch - mix it up 3", prop_diffPatch [hsx| <div><p>a</p><p>b</p><p>c</p></div> |] [hsx| <div><p>a</p><p>bbb</p><p>c</p></div> |])
         , ("prop_Random", prop_Random)
+-}
         ]
 
 main :: IO ()
