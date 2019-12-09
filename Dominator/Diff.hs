@@ -8,6 +8,7 @@ import Data.Maybe (catMaybes, fromJust, isNothing)
 import Data.Monoid ((<>))
 import Data.Text (Text, pack)
 import qualified Data.Text as Text
+import Debug.Trace (trace)
 import Dominator.Types (Html(..), Attr(..), descendants, flattenCData)
 
 data Patch
@@ -21,11 +22,11 @@ data Patch
 --      deriving Eq
 
 instance Show Patch where
-  show None = "None"
+  show None               = "None"
   show (VText t)          = "VText "  <> Text.unpack t
   show (VNode e)          = "VNode "  <> show e
   show (Props add removeAttrs removeProps) = "Props "  <> show add <> " " <> show removeAttrs <> " " <> show removeProps
-  show (Reorder moves)      = "Order " <> show moves
+  show (Reorder moves)    = "Order "  <> show moves
   show (Insert node)      = "Insert " <> show node
   show Remove             = "Remove"
 
@@ -98,7 +99,9 @@ What happens if some of the nodes do not have keys?
 
 diffChildren :: Int -> [Html] -> [Html] -> Int -> [(Int, [Patch])]
 diffChildren parentIndex childrenA childrenB' index =
-  let (childrenB, moves) = reorder childrenA childrenB'
+  let -- FIXME: disabled reorder because it is broken. Fix it!
+      -- (childrenB, moves) = trace ("childrenA = " ++ show childrenA ++ " childrenB = " ++ show childrenB') (reorder childrenA childrenB')
+      (childrenB, moves) = (childrenB', [])
       patches = case (childrenA, childrenB) of
         ([], []) -> []
         ([], (b:bs)) ->
@@ -161,13 +164,27 @@ reorder aChildren bChildren =
     if (null aKeys || null bKeys)
     -- if there were no keys in aChildren or no keys in bChildren, then do not reorder
     then (bChildren, [])
-    else let (newChildren, bFree') = matchChildren aChildren bFree bKeys []
+    else let (newChildren', bFree') = matchChildren aChildren bFree bKeys []
+             newChildren = (appendNewKeys aKeys newChildren' bChildren) ++ (map (Just . snd) bFree')
              moves = calcMoves bKeys (zip [0..] bChildren) (zip [0..] newChildren)
          in (catMaybes newChildren, moves)
   where
     key :: Html -> Maybe Text
     key (Element _ k _ _ ) = k
     key _ = Nothing
+
+    -- actually prepends
+    appendNewKeys aKeys newChildren [] = newChildren
+    appendNewKeys aKeys newChildren (b:bs) =
+      case key b of
+        (Just k) ->
+          case Map.lookup k aKeys of
+            -- a new key which was not in the old children
+            Nothing   -> appendNewKeys aKeys (Just b : newChildren) bs
+            -- key already matched in old children
+            (Just {}) -> appendNewKeys aKeys newChildren bs
+        -- no key
+        Nothing -> appendNewKeys aKeys newChildren bs
 
     matchChildren :: [Html] -> [(Int, Html)] -> Map Text (Int, Html) -> [Maybe Html] -> ([Maybe Html], [(Int, Html)])
     -- if aItem has a key try to match it with an element in bKeys
@@ -193,6 +210,14 @@ reorder aChildren bChildren =
         Nothing -> calcMoves bKeys bChildren []
         -- key is now an insert
         (Just k) -> (InsertKey i k) : calcMoves bKeys bChildren []
+    --  out of wanted, so remove remaining simulated
+    calcMoves bKeys [] simulated =
+      let removeK (simulateIndex, mSimulateItem) =
+            case mSimulateItem of
+              (Just (Element _ mKeySimulate _ _)) -> RemoveKey simulateIndex mKeySimulate
+              _ -> RemoveKey simulateIndex Nothing
+      in
+        map removeK simulated
     calcMoves bKeys b@((wantedIndex, wantedItem):bChildren) ((simulateIndex, mSimulateItem) : newChildren) =
       case mSimulateItem of
         Nothing -> RemoveKey simulateIndex Nothing : calcMoves bKeys b newChildren
@@ -222,7 +247,7 @@ reorder aChildren bChildren =
                                   else remove : calcMoves bKeys bChildren newChildren
                                 _ -> remove : calcMoves bKeys bChildren newChildren
 
-                            | otherwise -> error "whee" -- (InsertKey wantedIndex keyWanted) : calcMoves bKeys bChildren newChildren
+                            | otherwise -> (InsertKey wantedIndex keyWanted) : calcMoves bKeys bChildren newChildren
 
                           _ -> (InsertKey wantedIndex keyWanted) : calcMoves bKeys bChildren newChildren
 

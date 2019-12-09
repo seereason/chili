@@ -147,7 +147,7 @@ apply'' document body node patch =
                       replaceChild parent newChild node
                       return ()
       Reorder moves ->
-        do debugStrLn $ "Reorder: " ++ show moves
+        do putStrLn $ "Reorder: " ++ show moves
            cs <- childNodes node
            l <- getLength cs
            debugStrLn $ "Reorder: " ++ show moves
@@ -156,6 +156,7 @@ apply'' document body node patch =
            let removes = reverse $ sort $ [ RemoveKey i mKey| RemoveKey i mKey <- moves ]
                inserts = [ InsertKey i key | InsertKey i key <- moves ]
            keyMap <- applyRemoves node cs Map.empty removes
+           print (Map.keys keyMap)
            applyInserts node cs keyMap inserts
            pure ()
 
@@ -169,8 +170,10 @@ applyRemoves parent children keyMap (move:moves) =
                Nothing -> keyMap
                (Just key) -> Map.insert key child keyMap
          l <- getLength  children
-         debugStrLn ("remove " ++ show i ++ " from list of length " ++ show l)
-         removeChild parent (Just child)
+         putStrLn ("remove " ++ show i ++ " from list of length " ++ show l)
+         if (i < fromIntegral l)
+           then removeChild parent (Just child)
+           else pure Nothing
          applyRemoves parent children keyMap' moves
 
 applyInserts :: JSNode -> JSNodeList -> Map Text JSNode -> Moves -> IO ()
@@ -179,7 +182,7 @@ applyInserts parent children keyMap (move:moves) =
   case move of
     (InsertKey i key) ->
       case Map.lookup key keyMap of
-        Nothing -> error $  "applyInserts: missing key - " ++ Text.unpack key
+        Nothing -> error $  "applyInserts: the missing key - " ++ Text.unpack key ++ " keys=" ++ show (Map.keys keyMap)
         (Just n) ->
           do (Just before) <- item children (fromIntegral i)
              insertBefore parent n before
