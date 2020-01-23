@@ -17,6 +17,7 @@ module Dominator.Types
        , appendChild
        , createJSTextNode
        , createJSElement
+       , fromEventTarget
        , getAttribute
        , getFirstChild
        , isEqualNode
@@ -31,7 +32,7 @@ module Dominator.Types
 
 import Control.Concurrent.MVar (MVar)
 import Control.Monad.Trans (MonadIO(liftIO))
-import Chili.Types (EventObjectOf, IsEvent, IsJSNode(toJSNode), JSDocument, JSElement, JSTextNode, JSNode, MouseEvent(..), MouseEventObject(..), addEventListener, currentDocument, target, getAttribute, getFirstChild, isEqualNode, nextSibling, removeChildren, setAttribute, setProperty, setNodeValue)
+import Chili.Types (EventObjectOf, IsEvent, IsJSNode(toJSNode), JSDocument, JSElement, JSTextNode, JSNode, MouseEvent(..), MouseEventObject(..), addEventListener, currentDocument, fromEventTarget, getAttribute, getFirstChild, isEqualNode, nextSibling, removeChildren, setAttribute, setProperty, setNodeValue, target)
 import Data.JSString (JSString)
 import qualified Data.JSString as JS
 import Data.JSString.Text (textToJSString, textFromJSString)

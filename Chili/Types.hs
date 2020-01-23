@@ -1,5 +1,5 @@
 {-# LANGUAGE ConstrainedClassMethods, ExistentialQuantification, FlexibleContexts, FlexibleInstances, GADTs, JavaScriptFFI, ScopedTypeVariables, TypeFamilies #-}
-{-# language GeneralizedNewtypeDeriving #-}
+{-# language GeneralizedNewtypeDeriving, TypeApplications, AllowAmbiguousTypes #-}
 {-# language RankNTypes #-}
 module Chili.Types where
 
@@ -21,6 +21,7 @@ import Data.Aeson.Types (Parser, Result(..), parse)
 import Data.Char as Char (toLower)
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Monoid ((<>))
+import Data.Proxy (Proxy(..))
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.JSString as JS
@@ -54,6 +55,16 @@ maybeJSNullOrUndefined r = Just r
 newtype EIO a = EIO { eioToIO :: IO a }
   deriving (Functor, Applicative, Alternative, Monad, MonadPlus)
 
+
+class InstanceOf ty where
+  instanceOf :: (PToJSVal a) => a -> Bool
+
+instance InstanceOf JSElement where
+  instanceOf a = js_instanceOfJSElement (pToJSVal a)
+
+foreign import javascript unsafe "$1 instanceof Element"
+  js_instanceOfJSElement :: JSVal -> Bool
+
 {-
 fromJSValUnchecked :: (FromJSVal a) => JSVal a -> IO a
 fromJSValUnchecked j =
@@ -80,6 +91,17 @@ instance FromJSVal JSNode where
   fromJSVal = return . fmap JSNode . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
+
+-- | is this legit?
+instance IsEventTarget JSNode where
+  toEventTarget = EventTarget . unJSNode
+
+instance InstanceOf JSNode where
+  instanceOf a = js_instanceOfJSNode (pToJSVal a)
+
+foreign import javascript unsafe "$1 instanceof Node"
+  js_instanceOfJSNode :: JSVal -> Bool
+
 -- * IsJSNode
 
 class IsJSNode obj where
@@ -88,12 +110,37 @@ class IsJSNode obj where
 instance IsJSNode JSNode where
     toJSNode = id
 
+-- * EventTarget
+
+newtype EventTarget = EventTarget { unEventTarget :: JSVal }
+
+instance PToJSVal EventTarget where
+  pToJSVal (EventTarget jsval) = jsval
+
+instance Eq (EventTarget) where
+  (EventTarget a) == (EventTarget b) = js_eq a b
+
+instance ToJSVal EventTarget where
+  toJSVal = return . unEventTarget
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal EventTarget where
+  fromJSVal = return . fmap EventTarget . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
 -- * IsEventTarget
 
 class IsEventTarget o where
     toEventTarget :: o -> EventTarget
---    toEventTarget = EventTarget
 
+fromEventTarget :: forall o. (PFromJSVal o, InstanceOf o, IsEventTarget o) => EventTarget -> Maybe o
+fromEventTarget eventTarget@(EventTarget jsval) =
+      if instanceOf @o eventTarget
+      then Just (pFromJSVal jsval)
+      else Nothing
+
+instance IsEventTarget EventTarget where
+  toEventTarget et = et
 
 -- * JSNodeList
 
@@ -196,6 +243,12 @@ instance IsJSNode JSDocument where
 instance IsEventTarget JSDocument where
     toEventTarget = EventTarget . unJSDocument
 
+instance InstanceOf JSDocument where
+  instanceOf a = js_instanceOfJSDocument (pToJSVal a)
+
+foreign import javascript unsafe "$1 instanceof Document"
+  js_instanceOfJSDocument :: JSVal -> Bool
+
 foreign import javascript unsafe "new window[\"Document\"]()"
         js_newDocument :: IO JSDocument
 
@@ -246,6 +299,12 @@ instance FromJSVal JSWindow where
 
 instance IsEventTarget JSWindow where
     toEventTarget = EventTarget . unJSWindow
+
+foreign import javascript unsafe "$1 instanceof Window"
+  js_instanceOfJSWindow :: JSVal -> Bool
+
+instance InstanceOf JSWindow where
+  instanceOf a = js_instanceOfJSWindow (pToJSVal a)
 
 foreign import javascript unsafe "$r = (typeof window === 'undefined') ? null : window"
   js_window :: IO JSVal
@@ -663,19 +722,6 @@ setNodeValue node val = liftIO $ js_setNodeValue node val
 
 -- * Events
 
-newtype EventTarget = EventTarget { unEventTarget :: JSVal }
-
-instance Eq (EventTarget) where
-  (EventTarget a) == (EventTarget b) = js_eq a b
-
-instance ToJSVal EventTarget where
-  toJSVal = return . unEventTarget
-  {-# INLINE toJSVal #-}
-
-instance FromJSVal EventTarget where
-  fromJSVal = return . fmap EventTarget . maybeJSNullOrUndefined
-  {-# INLINE fromJSVal #-}
-
 instance IsEventTarget JSElement where
     toEventTarget = EventTarget . unJSElement
 
@@ -931,26 +977,21 @@ foreign import javascript unsafe "$1[\"defaultPrevented\"]" js_defaultPrevented 
 defaultPrevented :: (IsEventObject obj, MonadIO m) => obj -> m Bool
 defaultPrevented obj = liftIO (js_defaultPrevented (asEventObject obj))
 
-foreign import javascript unsafe "$1[\"target\"]" js_target ::
-        EventObject -> JSVal
-
-target :: (IsEventObject obj) => obj -> JSElement
-target obj = JSElement (js_target (asEventObject obj))
-
-
 foreign import javascript unsafe "$1[\"currentTarget\"]" js_currentTarget ::
-        EventObject -> JSVal
+        EventObject -> EventTarget
 
-currentTarget :: (IsEventObject obj) => obj -> JSElement
-currentTarget obj = JSElement (js_currentTarget (asEventObject obj))
+currentTarget :: (IsEventObject obj) => obj -> EventTarget
+currentTarget obj = js_currentTarget (asEventObject obj)
 
--- target :: (IsEventObject obj, MonadIO m) => obj -> m JSElement
--- target obj = liftIO (fromJSValUnchecked =<< (js_target (asEventObject obj)))
+foreign import javascript unsafe "$1[\"target\"]" js_target ::
+        EventObject -> EventTarget
+
+target :: (IsEventObject obj) => obj -> EventTarget
+target obj = js_target (asEventObject obj)
 
 foreign import javascript unsafe "$1[\"preventDefault\"]()" js_preventDefault ::
         EventObject -> IO ()
 
--- preventDefault :: (IsEventObject obj, MonadIO m) => obj -> m ()
 preventDefault :: (IsEventObject obj) => obj -> IO ()
 preventDefault obj = (js_preventDefault (asEventObject obj))
 
@@ -1192,6 +1233,12 @@ instance Eq (XMLHttpRequest) where
 
 instance IsEventTarget XMLHttpRequest where
     toEventTarget = EventTarget . unXMLHttpRequest
+
+foreign import javascript unsafe "$1 instanceof XMLHttpRequest"
+  js_instanceOfXMLHttpRequest :: JSVal -> Bool
+
+instance InstanceOf XMLHttpRequest where
+  instanceOf a = js_instanceOfXMLHttpRequest (pToJSVal a)
 
 {-
 instance PToJSVal XMLHttpRequest where
@@ -1700,10 +1747,6 @@ data Control event = forall model remote. (Show model) => Control
 
 descendants :: [Html model] -> Int
 descendants elems = sum [ descendants children | Element _n _attrs children <- elems] + (length elems)
-
--- | is this legit?
-instance IsEventTarget JSNode where
-  toEventTarget = EventTarget . unJSNode
 
 -- I believe that if we try to `appendChild` several `CData` nodes
 -- that the browser will consolidate them into a single node. That

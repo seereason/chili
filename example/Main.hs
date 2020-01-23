@@ -17,12 +17,13 @@ import qualified Data.JSString as JS
 import Data.JSString.Text (textToJSString, textFromJSString)
 import Chili.Loop (loop)
 import Chili.TDVar (modifyTDVar)
-import Chili.Types (Attr(..), Control(..), EventTarget(..), EventObject(..), Event(..), IsEventTarget(..), IsEventObject(..), IsEvent(..), EventObjectOf(..), Html(..), JSDocument, JSNode, MouseEvent(..), MouseEventObject(..), MkEvent(..), js_alert, addEventListener, appendChild, currentDocument, currentTarget, createJSElement, createJSTextNode, dispatchEvent, getElementsByTagName, item, parentNode, removeChildren, setAttribute, toJSNode, maybeJSNullOrUndefined, newEvent, unJSNode, target, stopPropagation, js_alert, focus)
+import Chili.Types (Attr(..), Control(..), EventTarget(..), EventObject(..), Event(..), IsEventTarget(..), IsEventObject(..), IsEvent(..), EventObjectOf(..), Html(..), JSDocument, JSNode, MouseEvent(..), MouseEventObject(..), MkEvent(..), js_alert, addEventListener, appendChild, currentDocument, currentTarget, createJSElement, createJSTextNode, dispatchEvent, fromEventTarget, getElementsByTagName, getInnerHTML, item, parentNode, removeChildren, setAttribute, toJSNode, maybeJSNullOrUndefined, newEvent, unJSNode, target, stopPropagation, js_alert, focus)
 import Chili.HSX
 import GHCJS.Foreign (jsNull)
 import GHCJS.Types (JSVal(..), JSString(..))
 import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
 import Language.Haskell.HSX.QQ (hsx)
+import System.IO (hFlush, stdout)
 
 
 -- * Custom button tag which emits `Flicked` instead of `Click`
@@ -97,7 +98,11 @@ app _ model =
   [hsx|
     <div>
       <p><% "# clicks: " ++ show model %></p>
-      <button [ EL Click   (\e m -> atomically $ modifyTDVar m succ) ]>click me!</button>
+      <button [ EL Click   (\e m -> do let (Just elem) = fromEventTarget (target e)
+                                       h <- getInnerHTML elem
+                                       print h
+                                       hFlush stdout
+                                       atomically $ modifyTDVar m succ) ]>click me!</button>
       <% if model >= 2
            then [Cntl (myButton "flick me") Flicked (\_ m -> atomically $ modifyTDVar m succ)]
            else []
