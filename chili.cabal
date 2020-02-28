@@ -16,11 +16,14 @@ library
                        base >=4.8 && <4.13,
                        bytestring,
                        containers,
+                       haskell-src-meta,
+                       html-parse,
                        hsx2hs,
                        ghcjs-base,
                        lens,
                        mtl,
                        stm,
+                       template-haskell,
                        text
   default-language:    Haskell2010
   exposed-modules:
@@ -37,6 +40,8 @@ library
                   Chili.Internal
                   Dominator
                   Dominator.Diff
+                  Dominator.DOMC
+                  Dominator.JSDOM
                   Dominator.Patch
                   Dominator.HSX
                   Dominator.Types

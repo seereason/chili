@@ -3,9 +3,12 @@
 module Dominator.Types
        ( Html(..)
        , Attr(..)
-       , JSDocument
-       , JSElement
-       , JSNode
+       , Command(..)
+       , JSDocument(..)
+       , JSElement(..)
+       , JSNode(..)
+       , FormEvent(..)
+       , EventObject(..)
        , MouseEvent(..)
        , MouseEventObject(..)
        , addEventListener
@@ -17,13 +20,20 @@ module Dominator.Types
        , appendChild
        , createJSTextNode
        , createJSElement
+       , execCommand
        , fromEventTarget
        , getAttribute
+       , getChecked
        , getFirstChild
+       , getElementById
+       , getElementsByTagName
        , isEqualNode
+       , item
        , nextSibling
+       , queryCommandState
        , removeChildren
        , setAttribute
+       , setChecked
        , setProperty
        , setNodeValue
        , target
@@ -32,7 +42,7 @@ module Dominator.Types
 
 import Control.Concurrent.MVar (MVar)
 import Control.Monad.Trans (MonadIO(liftIO))
-import Chili.Types (EventObjectOf, IsEvent, IsJSNode(toJSNode), JSDocument, JSElement, JSTextNode, JSNode, MouseEvent(..), MouseEventObject(..), addEventListener, currentDocument, fromEventTarget, getAttribute, getFirstChild, isEqualNode, nextSibling, removeChildren, setAttribute, setProperty, setNodeValue, target)
+import Chili.Types (Command(..), EventObjectOf, IsEvent, IsJSNode(toJSNode), JSDocument(..), JSElement(..), JSTextNode(..), JSNode(..), FormEvent(..), EventObject(..), MouseEvent(..), MouseEventObject(..), addEventListener, currentDocument, execCommand, fromEventTarget, getAttribute, getChecked, getFirstChild, getElementById, getElementsByTagName, isEqualNode, item, queryCommandState, nextSibling, removeChildren, setAttribute, setChecked, setProperty, setNodeValue, target)
 import Data.JSString (JSString)
 import qualified Data.JSString as JS
 import Data.JSString.Text (textToJSString, textFromJSString)

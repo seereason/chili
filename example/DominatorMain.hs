@@ -68,3 +68,4 @@ inc domH mCounter =
   do atomically $ modifyTVar' mCounter (\(Counter i) -> Counter (succ i))
      -- note that we must explicity redraw the view
      updateView domH =<< view domH mCounter
+     

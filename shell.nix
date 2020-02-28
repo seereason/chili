@@ -30,10 +30,10 @@ let
         testHaskellDepends = [ base containers hspec hsx2hs text ];
         description = "yet another clientside ui library";
         license = stdenv.lib.licenses.bsd3;
-        inherit (np2.shell.nodeDependencies);
-        shellHook = ''
-             NODE_PATH=${np2.shell.nodeDependencies}/lib/node_modules
-        '';
+#        inherit (np2.shell.nodeDependencies);
+#        shellHook = ''
+#             NODE_PATH=${np2.shell.nodeDependencies}/lib/node_modules
+#        '';
       };
 
   haskellPackages = if compiler == "default"

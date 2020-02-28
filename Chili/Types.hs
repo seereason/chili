@@ -1,5 +1,5 @@
 {-# LANGUAGE ConstrainedClassMethods, ExistentialQuantification, FlexibleContexts, FlexibleInstances, GADTs, JavaScriptFFI, ScopedTypeVariables, TypeFamilies #-}
-{-# language GeneralizedNewtypeDeriving, TypeApplications, AllowAmbiguousTypes #-}
+{-# language GeneralizedNewtypeDeriving, TypeApplications, AllowAmbiguousTypes, OverloadedStrings #-}
 {-# language RankNTypes #-}
 module Chili.Types where
 
@@ -46,7 +46,6 @@ instance Eq JSVal where
 
 foreign import javascript unsafe
   "$1===$2" js_eq :: JSVal  -> JSVal  -> Bool
-
 
 maybeJSNullOrUndefined :: JSVal -> Maybe JSVal
 maybeJSNullOrUndefined r | isNull r || isUndefined r = Nothing
@@ -285,6 +284,122 @@ foreign import javascript unsafe "$r = $1[\"document\"]"
 document :: (MonadIO m) => JSWindow -> m (Maybe JSDocument)
 document w = liftIO $ fromJSVal =<< js_document w
 
+-- | Commands for 'execCommand' and 'queryCommandState'
+data Command
+  = BackColor
+  | Bold
+  | ClearAuthenticationCache
+  | ContentReadOnly
+  | CopyC
+  | CreateLink
+  | CutC
+  | DecreaseFontSize
+  | DefaultParagraphSeparator
+  | Delete
+  | EnableAbsolutePositionEditor
+  | EnableInlineTableEditing
+  | EnableObjectResizing
+  | FontName
+  | FontSize
+  | ForeColor
+  | FormatBlock
+  | ForwardDelete
+  | Heading
+  | HiliteColor
+  | IncreaseFontSize
+  | Indent
+  | InsertBrOnReturn
+  | InsertHorizontalRule
+  | InsertHTML
+  | InsertImage
+  | InsertOrderedList
+  | InsertUnorderedList
+  | InsertParagraph
+  | InsertText
+  | Italic
+  | JustifyCenter
+  | JustifyFull
+  | JustifyLeft
+  | JustifyRight
+  | Outdent
+  | PasteC
+  | Redo
+  | RemoveFormat
+  | SelectAll
+  | StrikeThrough
+  | Subscript
+  | Superscript
+  | Underline
+  | Undo
+  | Unlink
+  | UseCSS -- deprecated
+  | StyleWithCSS
+    deriving (Eq, Ord, Read, Show)
+
+commandStr :: Command -> JSString
+commandStr BackColor        = "backColor"
+commandStr Bold             = "bold"
+commandStr ClearAuthenticationCache = "clearAuthenticationCache"
+commandStr ContentReadOnly  = "contentReadOnly"
+commandStr CopyC             = "copy"
+commandStr CreateLink       = "createLink"
+commandStr CutC              = "cut"
+commandStr DecreaseFontSize = "decreaseFontSize"
+commandStr DefaultParagraphSeparator = "defaultParagraphSeparator"
+commandStr Delete = "delete"
+commandStr DefaultParagraphSeparator = "defaultParagraphSeparator"
+commandStr EnableInlineTableEditing = "enableInlineTableEditing"
+commandStr EnableObjectResizing = "enableObjectResizing"
+commandStr FontName = "fontName"
+commandStr FontSize = "fontSize"
+commandStr ForeColor = "foreColor"
+commandStr FormatBlock = "formatBlock"
+commandStr ForwardDelete = "forwardDelete"
+commandStr Heading = "heading"
+commandStr HiliteColor = "hiliteColor"
+commandStr IncreaseFontSize = "increaseFontSize"
+commandStr Indent = "indent"
+commandStr InsertBrOnReturn = "insertBrOnReturn"
+commandStr InsertHorizontalRule = "insertHorizontalRule"
+commandStr InsertHTML = "insertHTML"
+commandStr InsertImage = "insertImage"
+commandStr InsertOrderedList = "insertorderedlist"
+commandStr InsertUnorderedList = "insertUnorderedList"
+commandStr InsertParagraph = "insertParagraph"
+commandStr InsertText = "insertText"
+commandStr Italic = "italic"
+commandStr JustifyCenter = "justifyCenter"
+commandStr JustifyFull = "justifyFull"
+commandStr JustifyLeft = "justifyLeft"
+commandStr JustifyRight = "justifyRight"
+commandStr Outdent = "outdent"
+commandStr PasteC = "paste"
+commandStr Redo = "redo"
+commandStr RemoveFormat = "removeFormat"
+commandStr SelectAll = "selectAll"
+commandStr StrikeThrough = "strikeThrough"
+commandStr Subscript = "subscript"
+commandStr Superscript = "superscript"
+commandStr Underline = "underline"
+commandStr Undo = "undo"
+commandStr Unlink = "unlink"
+commandStr UseCSS = "useCSS"
+commandStr StyleWithCSS = "styleWithCSS"
+
+foreign import javascript unsafe "$1[\"execCommand\"]($2,$3,$4)"
+        js_execCommand :: JSDocument -> JSString -> Bool -> JSVal -> IO Bool
+
+-- | TODO: many commands not implemented
+execCommand :: (MonadIO m) => JSDocument -> Command -> Bool -> Maybe JSString -> m Bool
+execCommand doc aCommand aShowDefaultUI aValueArgument  =
+  liftIO $ js_execCommand doc (commandStr aCommand) aShowDefaultUI (maybe jsNull pToJSVal aValueArgument)
+
+foreign import javascript unsafe "$1[\"queryCommandState\"]($2)"
+        js_queryCommandState :: JSDocument -> JSString -> IO Bool
+
+queryCommandState :: (MonadIO m) => JSDocument -> Command -> m Bool
+queryCommandState doc aCommand = liftIO (js_queryCommandState doc (commandStr aCommand))
+
 -- * JSWindow
 
 newtype JSWindow = JSWindow { unJSWindow ::  JSVal }
@@ -401,6 +516,12 @@ foreign import javascript unsafe "$1[\"innerHTML\"]"
 getInnerHTML :: (MonadIO m) => JSElement -> m JSString
 getInnerHTML element = liftIO $ js_getInnerHTML element
 
+foreign import javascript unsafe "$1[\"outerHTML\"]"
+        js_getOuterHTML :: JSElement -> IO JSString
+
+getOuterHTML :: (MonadIO m) => JSElement -> m JSString
+getOuterHTML element = liftIO $ js_getOuterHTML element
+
 -- * childNodes
 
 foreign import javascript unsafe "$1[\"childNodes\"]"
@@ -423,6 +544,19 @@ getElementsByName ::
 getElementsByName self elementName
   = liftIO
       ((js_getElementsByName self) elementName
+       >>= return . Just)
+
+foreign import javascript unsafe "$1[\"getElementsByClassName\"]($2)"
+        js_getElementsByClassNameE ::
+        JSElement -> JSString -> IO JSNodeList
+
+-- | <https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementsByClassName>
+getElementsByClassNameE ::
+                  (MonadIO m) =>
+                    JSElement -> JSString -> m (Maybe JSNodeList)
+getElementsByClassNameE elem elementName
+  = liftIO
+      ((js_getElementsByClassNameE elem) elementName
        >>= return . Just)
 
 foreign import javascript unsafe "$1[\"getElementsByTagName\"]($2)"
@@ -602,7 +736,7 @@ getAttribute :: (MonadIO m) =>
                 JSElement
              -> JSString
              -> m (Maybe JSString)
-getAttribute self name = liftIO (js_getAttribute self name >>= fromJSVal)
+getAttribute self name = liftIO (pFromJSVal <$> js_getAttribute self name)
 
 foreign import javascript unsafe "$1[\"removeAttribute\"]($2)"
         js_removeAttribute :: JSElement -> JSString -> IO ()
@@ -616,18 +750,30 @@ foreign import javascript unsafe "$1[\"style\"][$2] = $3"
         setStyle :: JSElement -> JSString -> JSString -> IO ()
 
 foreign import javascript unsafe "$1[$2] = $3"
-        js_setProperty :: JSElement -> JSString -> JSString -> IO ()
+        js_setProperty :: JSElement -> JSString -> JSVal -> IO ()
 
-setProperty :: (MonadIO m) => JSElement -> Text -> Text -> m ()
+setProperty :: (MonadIO m, PToJSVal v) => JSElement -> Text -> v -> m ()
 setProperty self name value
   = liftIO
-      (js_setProperty self (textToJSString name) (textToJSString value))
+      (js_setProperty self (textToJSString name) (pToJSVal value))
 
 foreign import javascript unsafe "delete $1[$2]"
     js_delete :: JSVal -> JSString -> IO ()
 
 deleteProperty :: (MonadIO m) => JSElement -> Text -> m ()
 deleteProperty e n = liftIO (js_delete (unJSElement e) (textToJSString n))
+
+foreign import javascript unsafe "$r = $1[\"checked\"]"
+  js_getChecked :: JSElement -> IO Bool
+
+getChecked :: (MonadIO m) => JSElement -> m Bool
+getChecked e = liftIO $ js_getChecked e
+
+foreign import javascript unsafe "$1[\"checked\"] = $2"
+        js_setChecked :: JSElement -> Bool -> IO ()
+
+setChecked :: (MonadIO m) => JSElement -> Bool -> m ()
+setChecked e b = liftIO $ js_setChecked e b
 
 {-
 setCSS :: (MonadIO m) =>
@@ -653,6 +799,18 @@ foreign import javascript unsafe "$1[\"value\"] = $2"
 setValue :: (MonadIO m, IsJSNode self) => self -> Text -> m ()
 setValue self str =
     liftIO (js_setValue (toJSNode self) (textToJSString str))
+
+foreign import javascript unsafe "$1[\"hasFocus\"]()"
+        js_hasFocus :: JSDocument -> IO Bool
+
+hasFocus :: (MonadIO m) => JSDocument -> m Bool
+hasFocus doc = liftIO (js_hasFocus doc)
+
+foreign import javascript unsafe "$r = $1[\"activeElement\"]"
+        js_getActiveElement :: JSDocument -> IO JSElement
+
+getActiveElement :: (MonadIO m) => JSDocument -> m JSElement
+getActiveElement d = liftIO (js_getActiveElement d)
 
 -- * dataset
 
@@ -1592,6 +1750,11 @@ removeAllRanges s = liftIO $ js_removeAllRanges s
 foreign import javascript unsafe "$1[\"toString\"]()"
  selectionToString :: Selection -> IO JSString
 
+foreign import javascript unsafe "$1[\"containsNode\"]($2,$3)"
+ js_containsNode :: Selection -> JSNode -> Bool -> IO Bool
+
+containsNode :: (MonadIO m) => Selection -> JSNode -> Bool -> m Bool
+containsNode sel node partialContainment = liftIO (js_containsNode sel node partialContainment)
 
 -- * Range
 
@@ -1625,6 +1788,9 @@ foreign import javascript unsafe "$1[\"selectNode\"]($2)"
 
 foreign import javascript unsafe "$1[\"toString\"]()"
   js_rangeToString :: Range -> IO JSString
+
+rangeToJSString :: Range -> IO JSString
+rangeToJSString r = liftIO (js_rangeToString r)
 
 selectNode :: Range -> JSNode -> IO ()
 selectNode r n = js_selectNode r n
