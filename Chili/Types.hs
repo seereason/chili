@@ -806,6 +806,12 @@ foreign import javascript unsafe "$1[\"hasFocus\"]()"
 hasFocus :: (MonadIO m) => JSDocument -> m Bool
 hasFocus doc = liftIO (js_hasFocus doc)
 
+foreign import javascript unsafe "$1[\"matches\"]($2)"
+        js_matches :: JSElement -> JSString -> IO Bool
+
+matches :: (MonadIO m) => JSElement -> Text -> m Bool
+matches e selectorStr = liftIO $ (js_matches e (textToJSString selectorStr))
+
 foreign import javascript unsafe "$r = $1[\"activeElement\"]"
         js_getActiveElement :: JSDocument -> IO JSElement
 
@@ -1734,6 +1740,25 @@ foreign import javascript unsafe "$1[\"addRange\"]($2)"
 
 addRange :: (MonadIO m) => Selection -> Range -> m ()
 addRange selection range = liftIO $ (js_addRange selection range)
+
+foreign import javascript unsafe "$1[\"collapse\"]($2, $3)"
+  js_collapse :: Selection -> JSNode -> Int -> IO ()
+
+collapse :: (MonadIO m) => Selection -> Maybe JSNode -> Maybe Int -> m ()
+collapse sel mNode mOffset = liftIO $ js_collapse sel (fromMaybe (JSNode jsNull) mNode) (fromMaybe 0 mOffset)
+
+foreign import javascript unsafe "$1[\"collapseToStart\"]()"
+  js_collapseToStart :: Selection -> IO ()
+
+collapseToStart :: (MonadIO m) => Selection -> m ()
+collapseToStart s = liftIO (js_collapseToStart s)
+
+foreign import javascript unsafe "$1[\"collapseToEnd\"]()"
+  js_collapseToEnd :: Selection -> IO ()
+
+collapseToEnd :: (MonadIO m) => Selection -> m ()
+collapseToEnd s = liftIO (js_collapseToEnd s)
+
 
 foreign import javascript unsafe "$1[\"getRangeAt\"]($2)"
         js_getRangeAt :: Selection -> Int -> IO Range
