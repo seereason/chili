@@ -400,6 +400,15 @@ foreign import javascript unsafe "$1[\"queryCommandState\"]($2)"
 queryCommandState :: (MonadIO m) => JSDocument -> Command -> m Bool
 queryCommandState doc aCommand = liftIO (js_queryCommandState doc (commandStr aCommand))
 
+
+foreign import javascript unsafe "$1[\"queryCommandValue\"]($2)"
+        js_queryCommandValue :: JSDocument -> JSString -> IO JSString
+
+queryCommandValue :: (MonadIO m) => JSDocument -> Command -> m Text
+queryCommandValue doc aCommand =
+  do v <- liftIO (js_queryCommandValue doc (commandStr aCommand))
+     pure (textFromJSString v)
+
 -- * JSWindow
 
 newtype JSWindow = JSWindow { unJSWindow ::  JSVal }
@@ -1759,6 +1768,11 @@ foreign import javascript unsafe "$1[\"collapseToEnd\"]()"
 collapseToEnd :: (MonadIO m) => Selection -> m ()
 collapseToEnd s = liftIO (js_collapseToEnd s)
 
+foreign import javascript unsafe "$r = $1[\"isCollapsed\"]"
+  js_isCollapsed :: Selection -> IO Bool
+
+isCollapsed :: (MonadIO m) => Selection -> m Bool
+isCollapsed sel = liftIO $ js_isCollapsed sel
 
 foreign import javascript unsafe "$1[\"getRangeAt\"]($2)"
         js_getRangeAt :: Selection -> Int -> IO Range
