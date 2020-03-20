@@ -1100,6 +1100,13 @@ instance IsEvent SelectionEvent where
   eventToJSString SelectionStart  = JS.pack "selectionstart"
   eventToJSString SelectionChange = JS.pack "selectionchange"
 
+data ElementScrollEvent
+  = ElementScroll
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+instance IsEvent ElementScrollEvent where
+  eventToJSString ElementScroll  = JS.pack "scroll"
+
 -- https://developer.mozilla.org/en-US/docs/Web/API/ProgressEvent
 -- data ProgressEvent =
 
@@ -1118,6 +1125,7 @@ data EventType
   | MiscEvent MiscEvent
   | TouchEvent TouchEvent
   | SelectionEvent SelectionEvent
+  | ElementScrollEvent ElementScrollEvent
   deriving (Eq, Ord, Show, Read)
 -- * Event Objects
 
@@ -1302,6 +1310,29 @@ instance FromJSVal ProgressEventObject where
 
 -- charCode :: (MonadIO m) => KeyboardEventObject -> IO 
 
+-- * ElementScrollObject
+
+newtype ElementScrollEventObject = ElementScrollEventObject { unElementScrollEventObject :: JSVal }
+
+instance Show ElementScrollEventObject where
+  show _ = "ElementScrollEventObject"
+
+instance ToJSVal ElementScrollEventObject where
+  toJSVal = return . unElementScrollEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal ElementScrollEventObject where
+  fromJSVal = return . fmap ElementScrollEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject ElementScrollEventObject where
+  asEventObject (ElementScrollEventObject jsval) = EventObject jsval
+
+foreign import javascript unsafe "$1[\"scrollTop\"]" scrollTop ::
+        ElementScrollEventObject -> Int
+foreign import javascript unsafe "$1[\"scrollLeft\"]" scrollLeft ::
+        ElementScrollEventObject -> Int
+
 -- * EventObjectOf
 
 type family EventObjectOf event :: *
@@ -1314,6 +1345,7 @@ type instance EventObjectOf ProgressEvent  = ProgressEventObject
 type instance EventObjectOf ClipboardEvent = ClipboardEventObject
 type instance EventObjectOf SelectionEvent = SelectionEventObject
 type instance EventObjectOf DragEvent      = DragEventObject
+type instance EventObjectOf ElementScrollEvent = ElementScrollEventObject
 
 -- * DOMRect
 
