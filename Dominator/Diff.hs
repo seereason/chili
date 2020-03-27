@@ -201,6 +201,7 @@ reorder aChildren bChildren =
         -- no more free times in bFree, so remaining free items in 'a' are deleted
         [] -> matchChildren as bFree bKeys (Nothing : newChildren)
     matchChildren [] bFree _ newChildren = (reverse newChildren, bFree)
+    matchChildren _ _ _ _ = error "Dominator.Diff.matchChildren"
 
     calcMoves :: Map Text (Int, Html) -> [(Int, Html)] -> [(Int, Maybe Html)] -> Moves
     calcMoves _ [] [] = []
@@ -262,6 +263,8 @@ reorder aChildren bChildren =
                         RemoveKey simulateIndex (Just keySimulate) : calcMoves bKeys b newChildren
                       -- in theory the == above should make this case impossible
                       Nothing -> error "Diff -> reorder -> calcMoves: can this happen?" -- calcMoves bChildren newChildren (succ simulateIndex)
+            (CData _, _) -> error "Dominator.Diff.reorder 2"
+            (Element _ _ _ _, CData _) -> error "Dominator.Diff.reorder 1"
 
 slice :: [(Int, a)] -> [(Int, a)]
 slice cs = map (\(i,c) -> (pred i, c)) cs

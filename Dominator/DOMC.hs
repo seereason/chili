@@ -102,6 +102,7 @@ renderHtml doc (Element tag attrs children) =
         liftIO $ debugStrLn $ "Adding event listener for " ++ show eventType
         addEventListener elem eventType (\e -> {- putStrLn "eventHandler start" >> -} (eventHandler e) {- >> putStrLn "eventHandler end"-}) False
 -}
+renderHtml _ Noop = error "Dominator.DOMC.renderHtml"
 
 -- FIXME: this should not strip whitespace instead of <pre> and <code> tags
 stripWhitespace :: [Token] -> [Token]
@@ -188,6 +189,7 @@ selectorName' (F Start) = "f"
 selectorName' (N Start) = "f"
 selectorName' (F p) = "f_" ++ selectorName' p
 selectorName' (N p) = "n_" ++ selectorName' p
+selectorName' (E _) = error "Dominator.DOMC.selectorName'"
 
 data UpdateNode
   = UpdateAttribute String
@@ -382,6 +384,7 @@ findAttrExpr p (Attr name val) =
         "expr" -> Just (E p, reverse $ drop 2 $ reverse $ rest, AttrList)
         _ -> Just (A name p, reverse $ drop 2 $ reverse $ rest, Str)
     _ -> Nothing
+findAttrExpr _ _ = error "Dominator.DOMC.findAttrExpr"
 
 {-
 findExpressions :: JSNode -> [Html] -> IO [(JSNode, String)]

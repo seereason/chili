@@ -348,6 +348,7 @@ commandStr DecreaseFontSize = "decreaseFontSize"
 commandStr DefaultParagraphSeparator = "defaultParagraphSeparator"
 commandStr Delete = "delete"
 commandStr DefaultParagraphSeparator = "defaultParagraphSeparator"
+commandStr EnableAbsolutePositionEditor = "enableAbsolutePositionEditor"
 commandStr EnableInlineTableEditing = "enableInlineTableEditing"
 commandStr EnableObjectResizing = "enableObjectResizing"
 commandStr FontName = "fontName"
@@ -1655,6 +1656,7 @@ instance FromJSVal XMLHttpRequestResponseType where
                 return (Just XMLHttpRequestResponseTypeJson)
             | x == js_XMLHttpRequestResponseTypeText =
                 return (Just XMLHttpRequestResponseTypeText)
+            | otherwise = error "instance FromJSVal XMLHttpRequestResponseType"
 
 foreign import javascript unsafe "$1[\"response\"]" js_getResponse
         :: XMLHttpRequest
