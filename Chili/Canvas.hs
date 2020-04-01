@@ -285,13 +285,8 @@ mkPath ctx segments =
 
 
 -- https://gist.github.com/joubertnel/870190
-drawCanvas :: Canvas -> IO ()
-drawCanvas (Canvas cid content) =
-  do (Just document) <- currentDocument
-     mCanvasElem <- getElementById document (textToJSString cid)
-     case mCanvasElem of
-      Nothing       -> pure ()
-      (Just canvasElem) ->
+drawCanvas :: JSElement -> Canvas2D -> IO ()
+drawCanvas canvasElem content =
            -- http://www.html5rocks.com/en/tutorials/canvas/hidpi/
            -- NOTE: backingStorePixelRatio is deprecated, we just ignore it
         do rescaleCanvas <- do ms <- Chili.getData canvasElem (JS.pack "rescale")
