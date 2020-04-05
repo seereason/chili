@@ -22,6 +22,18 @@ import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib (tupleT)
 import Language.Haskell.Meta.Parse (parseExp)
 
+{-
+This code currently expects the user will pass a simple record type like:
+
+  data Model = Model { fieldN = ... }
+
+to the view function. However, this means that all computed values need to be recalculated everytime the function is called because it is not known which fields in `Model` may have changed. It is also not know which fields each expression in the template depends upon.
+
+But what if we used a type-level map with a dirty flag? Could we analyze with fields each sub expression depends upon, figure out which fields have changed since the last call, and only update the potentially affected expressions?
+
+Inspired by DDLog (differential datalog).
+-}
+
 data Attr
   = Attr String String
   | PropS String String
