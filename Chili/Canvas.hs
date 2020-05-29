@@ -41,9 +41,12 @@ clearRect = js_clearRect
 
 renderColor :: Color -> JSString
 renderColor (ColorName c) = c
+renderColor (RGBA _ _ _ _) = error "Chili.Canvas.renderColor (RGBA _ _ _ _)"
 
 renderStyle :: Style -> JSString
 renderStyle (StyleColor color) = renderColor color
+renderStyle (StyleGradient _) = error "Chili.Canvas.renderStyle (StyleGradient _)"
+renderStyle (StylePattern _) = error "Chili.Canvas.renderStyle (StylePattern _)"
 
 foreign import javascript unsafe "$1[\"fillStyle\"] = $2"
         js_fillStyle ::
@@ -281,7 +284,7 @@ mkPath ctx segments =
        (MoveTo x y) -> moveTo ctx x y
        (LineTo x y) -> lineTo ctx x y
        (Arc x y radius startAngle endAngle counterClockwise) -> arc ctx x y radius startAngle endAngle counterClockwise
---        (Rect (Rect x y w h)) -> rect x y w h
+       (PathRect (Rect x y w h)) -> error "mkPath"
 
 
 -- https://gist.github.com/joubertnel/870190

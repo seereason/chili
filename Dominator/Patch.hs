@@ -40,6 +40,7 @@ renderHtml doc (Element tag mKey attrs children) =
       doAttr elem (EL eventType eventHandler) = do
         liftIO $ debugStrLn $ "Adding event listener for " ++ show eventType
         addEventListener elem eventType (\e -> {- putStrLn "eventHandler start" >> -} (eventHandler e) {- >> putStrLn "eventHandler end"-}) False
+      doAttr _ (OnCreate _) = error "Dominator.Patch.renderHtml"
 
 updateView :: DHandle -> Html -> IO ()
 updateView (DHandle root vdom doc) newHtml =
@@ -159,6 +160,7 @@ apply'' document body node patch =
            print (Map.keys keyMap)
            applyInserts node cs keyMap inserts
            pure ()
+      None -> error "Dominator.Patch.apply''"
 
 applyRemoves :: JSNode -> JSNodeList -> Map Text JSNode -> Moves -> IO (Map Text JSNode)
 applyRemoves parent children keyMap [] = pure keyMap
@@ -175,6 +177,7 @@ applyRemoves parent children keyMap (move:moves) =
            then removeChild parent (Just child)
            else pure Nothing
          applyRemoves parent children keyMap' moves
+    (InsertKey _ _) -> error "Dominator.Patch.applyRemoves"
 
 applyInserts :: JSNode -> JSNodeList -> Map Text JSNode -> Moves -> IO ()
 applyInserts parent children keyMap [] = pure ()
@@ -187,6 +190,7 @@ applyInserts parent children keyMap (move:moves) =
           do (Just before) <- item children (fromIntegral i)
              insertBefore parent n before
              applyInserts parent children keyMap moves
+    (RemoveKey _ _) -> error "Dominator.Patch.applyInserts"
 
 getNodes :: JSNode      -- ^ root node of DOM
          -> Html -- ^ virtual DOM that matches the current DOM

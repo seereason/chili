@@ -90,6 +90,14 @@ instance FromJSVal JSNode where
   fromJSVal = return . fmap JSNode . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
+instance PFromJSVal JSNode where
+  pFromJSVal = JSNode
+  {-# INLINE pFromJSVal #-}
+
+instance PToJSVal JSNode where
+  pToJSVal (JSNode jsval) = jsval
+  {-# INLINE pToJSVal #-}
+
 
 -- | is this legit?
 instance IsEventTarget JSNode where
@@ -108,6 +116,12 @@ class IsJSNode obj where
 
 instance IsJSNode JSNode where
     toJSNode = id
+
+fromJSNode :: forall o. (PFromJSVal o, InstanceOf o, IsJSNode o) => JSNode -> Maybe o
+fromJSNode jsnode@(JSNode jsval) =
+      if instanceOf @o jsnode
+      then Just (pFromJSVal jsval)
+      else Nothing
 
 -- * EventTarget
 
@@ -284,6 +298,12 @@ foreign import javascript unsafe "$r = $1[\"document\"]"
 document :: (MonadIO m) => JSWindow -> m (Maybe JSDocument)
 document w = liftIO $ fromJSVal =<< js_document w
 
+foreign import javascript unsafe "$r = $1[\"querySelector\"]"
+        js_querySelector :: JSDocument -> JSString -> IO JSVal
+
+querySelector :: (MonadIO m) => JSDocument -> JSString -> m (Maybe JSElement)
+querySelector d sel = liftIO $ fromJSVal =<< js_querySelector d sel
+
 -- | Commands for 'execCommand' and 'queryCommandState'
 data Command
   = BackColor
@@ -347,7 +367,7 @@ commandStr CutC              = "cut"
 commandStr DecreaseFontSize = "decreaseFontSize"
 commandStr DefaultParagraphSeparator = "defaultParagraphSeparator"
 commandStr Delete = "delete"
-commandStr DefaultParagraphSeparator = "defaultParagraphSeparator"
+commandStr EnableAbsolutePositionEditor = "enableAbsolutePositionEditor"
 commandStr EnableInlineTableEditing = "enableInlineTableEditing"
 commandStr EnableObjectResizing = "enableObjectResizing"
 commandStr FontName = "fontName"
@@ -661,6 +681,15 @@ replaceData :: (MonadIO m, IsJSNode self) =>
 replaceData self start length string =
     liftIO (js_replaceData (toJSNode self) start length (textToJSString string))
 
+-- * remove
+
+foreign import javascript unsafe "$1[\"remove\"]()"
+        js_remove :: JSNode -> IO ()
+
+remove :: (MonadIO m, IsJSNode self) => self -> m ()
+remove self
+  = liftIO (js_remove (toJSNode self))
+
 -- * removeChild
 
 foreign import javascript unsafe "$1[\"removeChild\"]($2)"
@@ -756,7 +785,12 @@ removeAttribute :: (MonadIO m) =>
 removeAttribute self name = liftIO (js_removeAttribute self (textToJSString name))
 
 foreign import javascript unsafe "$1[\"style\"][$2] = $3"
-        setStyle :: JSElement -> JSString -> JSString -> IO ()
+        js_setStyle :: JSElement -> JSString -> JSVal -> IO ()
+
+setStyle :: (MonadIO m, PToJSVal v) => JSElement -> JSString -> v -> m ()
+setStyle self name value
+  = liftIO
+      (js_setStyle self name (pToJSVal value))
 
 foreign import javascript unsafe "$1[$2] = $3"
         js_setProperty :: JSElement -> JSString -> JSVal -> IO ()
@@ -1100,6 +1134,13 @@ instance IsEvent SelectionEvent where
   eventToJSString SelectionStart  = JS.pack "selectionstart"
   eventToJSString SelectionChange = JS.pack "selectionchange"
 
+data ElementScrollEvent
+  = ElementScroll
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+instance IsEvent ElementScrollEvent where
+  eventToJSString ElementScroll  = JS.pack "scroll"
+
 -- https://developer.mozilla.org/en-US/docs/Web/API/ProgressEvent
 -- data ProgressEvent =
 
@@ -1118,6 +1159,7 @@ data EventType
   | MiscEvent MiscEvent
   | TouchEvent TouchEvent
   | SelectionEvent SelectionEvent
+  | ElementScrollEvent ElementScrollEvent
   deriving (Eq, Ord, Show, Read)
 -- * Event Objects
 
@@ -1300,7 +1342,30 @@ instance FromJSVal ProgressEventObject where
   fromJSVal = return . fmap ProgressEventObject . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
--- charCode :: (MonadIO m) => KeyboardEventObject -> IO 
+-- charCode :: (MonadIO m) => KeyboardEventObject -> IO
+
+-- * ElementScrollObject
+
+newtype ElementScrollEventObject = ElementScrollEventObject { unElementScrollEventObject :: JSVal }
+
+instance Show ElementScrollEventObject where
+  show _ = "ElementScrollEventObject"
+
+instance ToJSVal ElementScrollEventObject where
+  toJSVal = return . unElementScrollEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal ElementScrollEventObject where
+  fromJSVal = return . fmap ElementScrollEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject ElementScrollEventObject where
+  asEventObject (ElementScrollEventObject jsval) = EventObject jsval
+
+foreign import javascript unsafe "$1[\"scrollTop\"]" scrollTop ::
+        ElementScrollEventObject -> Int
+foreign import javascript unsafe "$1[\"scrollLeft\"]" scrollLeft ::
+        ElementScrollEventObject -> Int
 
 -- * EventObjectOf
 
@@ -1314,6 +1379,7 @@ type instance EventObjectOf ProgressEvent  = ProgressEventObject
 type instance EventObjectOf ClipboardEvent = ClipboardEventObject
 type instance EventObjectOf SelectionEvent = SelectionEventObject
 type instance EventObjectOf DragEvent      = DragEventObject
+type instance EventObjectOf ElementScrollEvent = ElementScrollEventObject
 
 -- * DOMRect
 
@@ -1623,6 +1689,7 @@ instance FromJSVal XMLHttpRequestResponseType where
                 return (Just XMLHttpRequestResponseTypeJson)
             | x == js_XMLHttpRequestResponseTypeText =
                 return (Just XMLHttpRequestResponseTypeText)
+            | otherwise = error "instance FromJSVal XMLHttpRequestResponseType"
 
 foreign import javascript unsafe "$1[\"response\"]" js_getResponse
         :: XMLHttpRequest
@@ -1750,6 +1817,12 @@ foreign import javascript unsafe "$1[\"addRange\"]($2)"
 addRange :: (MonadIO m) => Selection -> Range -> m ()
 addRange selection range = liftIO $ (js_addRange selection range)
 
+foreign import javascript unsafe "$r = $1[\"anchorNode\"]"
+  js_anchorNode :: Selection -> IO JSNode
+
+anchorNode :: (MonadIO m) => Selection -> m JSNode
+anchorNode s = liftIO (js_anchorNode s)
+
 foreign import javascript unsafe "$1[\"collapse\"]($2, $3)"
   js_collapse :: Selection -> JSNode -> Int -> IO ()
 
@@ -1824,6 +1897,13 @@ createRange d = js_createRange d
 -}
 foreign import javascript unsafe "$1[\"selectNode\"]($2)"
   js_selectNode :: Range -> JSNode -> IO ()
+
+
+foreign import javascript unsafe "$1[\"insertNode\"]($2)"
+  js_insertNode :: Range -> JSNode -> IO ()
+
+insertNode :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
+insertNode r n = liftIO (js_insertNode r (toJSNode n))
 
 foreign import javascript unsafe "$1[\"toString\"]()"
   js_rangeToString :: Range -> IO JSString
@@ -2205,3 +2285,27 @@ foreign import javascript unsafe "new $1.JSDOM($2).window"
 
 newJSDOM :: (MonadIO m) => JSDOM -> JSString -> m (Maybe JSWindow)
 newJSDOM jsdom html = liftIO $ fromJSVal =<< js_newJSDOM jsdom html
+
+-- * MediaElement
+
+class (PToJSVal o) => IsSrcObject o
+
+newtype MediaStream = MediaStream { unMediaStream :: JSVal }
+
+instance PToJSVal MediaStream where
+  pToJSVal (MediaStream jsval) = jsval
+
+instance IsSrcObject MediaStream
+
+newtype MediaElement = MediaElement { unMediaElement :: JSVal }
+
+
+-- | FIXME: this should somehow confirm that the element has the HTMLMediaElement interface
+asMediaElement :: JSElement -> Maybe MediaElement
+asMediaElement (JSElement v) = Just (MediaElement v)
+
+foreign import javascript unsafe "$1[\"srcObject\"] = $2"
+   js_setSrcObject :: MediaElement -> JSVal -> IO ()
+
+setSrcObject :: (MonadIO m, IsSrcObject o) => MediaElement -> o -> m ()
+setSrcObject me o = liftIO $ js_setSrcObject me (pToJSVal o)

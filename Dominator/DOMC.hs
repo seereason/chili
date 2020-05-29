@@ -1,7 +1,52 @@
 {-# language QuasiQuotes, TemplateHaskell, DeriveLift #-}
 module Dominator.DOMC where
+{-
 
-import Chili.Types (removeAttribute)
+The dream is to combine this with an implentation of differential datalog and mustache.
+
+Differential datalog will allows us to only update the portions of the
+DOM which are affected by changes in the input datae. Mustache will
+allow for simple templates that can be edited by junior level developers.
+
+It maybe also be sensible to combine acid-state with differential
+datalog to make the facts persistent.
+
+--
+
+When we first approach front-end design, we aim to abstract away from
+the imperative nature of the DOM and create something easier to
+managed.
+
+At first we imagine we can implement a framework by having the
+developer provide two pure functions:
+
+ view   :: model -> HTML
+ update :: event -> model -> model
+
+But there are several issues:
+
+ - speed
+ - loss of focus/caret position in input forms
+ - etc
+
+Using virtual DOM diff/patch technology we can avoid some of these
+issues. But it is slow and fragile.
+
+Next we realize that sometimes information flows in multiple
+directions.
+
+For example, we need to render an element to the screen, use getBoundClientRect to measure its size, and then render something else.
+
+Or, one form element might depend on some aspect of another form element, but that information does not really belong on the model in many cases?
+
+Multiple representations of data -- sql, json, ADT, etc.
+
+
+
+-}
+
+import Control.Monad.Trans (liftIO)
+import Chili.Types (removeAttribute, setStyle)
 import Dominator.Types (JSDocument, JSNode, JSElement(..), appendChild, createJSElement, createJSTextNode, getFirstChild, toJSNode, nextSibling, setAttribute, setNodeValue, setProperty)
 import Control.Monad.Trans (MonadIO)
 import qualified Data.Text.Lazy as L
@@ -11,6 +56,7 @@ import qualified Data.Text as Text
 import Data.Tree
 import Data.List (unzip)
 import Data.Maybe
+import Debug.Trace (trace)
 import qualified Data.JSString as JS
 -- import Dominator.Types
 import Text.HTML.Parser (Token(..), canonicalizeTokens, parseTokensLazy)
@@ -38,6 +84,7 @@ data Attr
   = Attr String String
   | PropS String String
   | PropB String Bool
+  | PropStyle String String
   deriving (Eq, Ord, Show, Lift)
 
 data Html
@@ -103,17 +150,20 @@ renderHtml doc (Element tag attrs children) =
      pure (toJSNode e)
     where
       -- fixme: strip out all expressions?
+      -- fixme: should this call `setAttr` for the not `expr` case?
       doAttr elem (Attr k v)
          | k == "expr" = pure ()
          | otherwise   = setAttribute elem (Text.pack k) (Text.pack v)
       doAttr elem (PropS k v)   = setProperty elem (Text.pack k) (Text.pack v)
       doAttr elem (PropB k v)   = setProperty elem (Text.pack k) v
+      doAttr elem (PropStyle k v) = setStyle elem (JS.pack k) (JS.pack v)
 --      doAttr elem (OnCreate f) = liftIO $ do cb <- asyncCallback $ f elem model
 --                                             js_setTimeout cb 0
 {-      doAttr elem (EL eventType eventHandler) = do
         liftIO $ debugStrLn $ "Adding event listener for " ++ show eventType
         addEventListener elem eventType (\e -> {- putStrLn "eventHandler start" >> -} (eventHandler e) {- >> putStrLn "eventHandler end"-}) False
 -}
+renderHtml _ Noop = error "Dominator.DOMC.renderHtml"
 
 -- FIXME: this should not strip whitespace instead of <pre> and <code> tags
 stripWhitespace :: [Token] -> [Token]
@@ -148,6 +198,7 @@ domcExpr template =
                             u <- $(mkUpdater html) (toJSNode e)
                             pure u
                       |]
+--         error $ show html
          init
 
 {-
@@ -184,7 +235,7 @@ mkUpdate (node, val) =
 pExp :: (Path, String, SpliceType) -> (Path, ExpQ, SpliceType)
 pExp (path, str, spliceType) =
   case parseExp str of
-    (Left e) -> error e
+    (Left e) -> error (str ++ "\n" ++  e)
     (Right e) ->
       case spliceType of
         Str      -> (path, [| StrV $(pure e) |] , spliceType)
@@ -200,6 +251,7 @@ selectorName' (F Start) = "f"
 selectorName' (N Start) = "f"
 selectorName' (F p) = "f_" ++ selectorName' p
 selectorName' (N p) = "n_" ++ selectorName' p
+selectorName' (E _) = error "Dominator.DOMC.selectorName'"
 
 data UpdateNode
   = UpdateAttribute String
@@ -266,14 +318,41 @@ mkUpdater html =
 -}
 -- toJSElement = JSElement . unJSNode
 
+-- fixme: should this handle `expr` attributes?
 setAttr :: JSElement -> Attr -> IO ()
 setAttr elem attr =
   case attr of
-    (Attr k v) -> setAttribute elem (Text.pack k) (Text.pack v)
-    (PropS k v) -> setProperty elem (Text.pack k) (Text.pack v)
-    (PropB k v) -> setProperty elem (Text.pack k) v
+    (Attr k v)      -> setAttribute elem (Text.pack k) (Text.pack v)
+    (PropS k v)     -> setProperty elem (Text.pack k) (Text.pack v)
+    (PropB k v)     -> setProperty elem (Text.pack k) v
+    (PropStyle k v) -> setStyle elem (JS.pack k) (JS.pack v)
 
 -- walks the template, finds the expressions, and constructs a function which takes the model and updates the elements
+{-
+So, how does this magic work?
+
+This function must be run after the DOM has been rendered.
+
+'mkUpdater' is going to return an anonymous function with the type 'model -> IO ()'.
+
+It first walks the virtual DOM '[Html]' and finds all the expressions in the
+tree. When finding the expressions, it remembers the path it had to
+walk to get there.
+
+It then uses that list of paths and walks the real DOM to find all the
+Nodes in the DOM.
+
+It now has a list of DOM nodes paired with the expression which updates that DOM node when the model changes.
+
+The TH then generates a function like:
+
+   \model ->
+     do setNodeValue n1 (JS.pack $ unStrV e1)
+        setProperty (JSElement (unJSNode n2)) (Text.pack nm) (Text.pack $ unStrV e2)
+
+The expressions like e1 and e2 contain references to `model`.
+
+-}
 mkUpdater :: [Html] -> ExpQ
 mkUpdater html =
   do -- let exps = findExpressions Start html
@@ -300,7 +379,7 @@ mkUpdater html =
                          pure $ \model -> do -- print path
                                              -- print html
 --                                             let (path, exp') = head pExps
---                                             n <- mkSelector rootNode path  
+--                                             n <- mkSelector rootNode path
 --                                             setNodeValue n (JS.pack $(exp))
                                              mapM_ (\((kind, n), e) ->
                                                      case kind of
@@ -353,15 +432,16 @@ mkUpdater html =
 {-
   case parseExp "message model" of
     (Left e) -> error e
-    (Right exp) -> 
+    (Right exp) ->
 -}
 
 data Path
-  = F Path -- first child
-  | N Path -- next sibling
-  | A String Path -- attribute-name
-  | E Path -- expression which returns a list of attributes to add (how do you remove them?)
-  | Start -- top-level
+  = F Path -- ^ first child
+  | N Path -- ^ next sibling
+  | A String Path -- ^ attribute-name
+  | E Path -- ^ expression which returns a list of attributes to add (how do you remove them?)
+  | H [Html] -- ^ expression which expands to a list of nodes
+  | Start -- ^ top-level
     deriving (Eq, Ord, Show, Lift)
 
 -- | find all the expressions in the tree. aka '{{ expr }}'
@@ -394,6 +474,7 @@ findAttrExpr p (Attr name val) =
         "expr" -> Just (E p, reverse $ drop 2 $ reverse $ rest, AttrList)
         _ -> Just (A name p, reverse $ drop 2 $ reverse $ rest, Str)
     _ -> Nothing
+findAttrExpr _ _ = error "Dominator.DOMC.findAttrExpr"
 
 {-
 findExpressions :: JSNode -> [Html] -> IO [(JSNode, String)]

@@ -11,6 +11,7 @@ import Dominator.Types (JSDocument, JSElement, JSNode, MouseEvent(..), MouseEven
 import Dominator.DOMC
 import Dominator.JSDOM
 import Language.Haskell.TH (Name, ExpQ, mkName)
+import System.IO (hFlush, stdout, hGetBuffering, hSetBuffering, BufferMode(..))
 
 data Model = Model
  { message    :: String
@@ -44,7 +45,8 @@ template =
 
 main :: IO ()
 main =
-  do assertDOM -- use jsdom if we are running under node
+  do hSetBuffering stdout LineBuffering
+     assertDOM -- use jsdom if we are running under node
      (Just d) <- currentDocument
      model <- newTVarIO initModel
      update <- template d
