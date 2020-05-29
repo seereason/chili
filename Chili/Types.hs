@@ -1367,6 +1367,29 @@ foreign import javascript unsafe "$1[\"scrollTop\"]" scrollTop ::
 foreign import javascript unsafe "$1[\"scrollLeft\"]" scrollLeft ::
         ElementScrollEventObject -> Int
 
+-- * ElementScrollObject
+
+newtype ElementScrollEventObject = ElementScrollEventObject { unElementScrollEventObject :: JSVal }
+
+instance Show ElementScrollEventObject where
+  show _ = "ElementScrollEventObject"
+
+instance ToJSVal ElementScrollEventObject where
+  toJSVal = return . unElementScrollEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal ElementScrollEventObject where
+  fromJSVal = return . fmap ElementScrollEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject ElementScrollEventObject where
+  asEventObject (ElementScrollEventObject jsval) = EventObject jsval
+
+foreign import javascript unsafe "$1[\"scrollTop\"]" scrollTop ::
+        ElementScrollEventObject -> Int
+foreign import javascript unsafe "$1[\"scrollLeft\"]" scrollLeft ::
+        ElementScrollEventObject -> Int
+
 -- * EventObjectOf
 
 type family EventObjectOf event :: *
