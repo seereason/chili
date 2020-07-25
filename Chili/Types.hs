@@ -646,21 +646,27 @@ appendChild self newChild
 
 foreign import javascript unsafe "$1[\"focus\"]()" focus :: JSElement -> IO ()
 
-{-
-probably broken on IE9
-
 -- * textContent
 
 foreign import javascript unsafe "$1[\"textContent\"] = $2"
-        js_setTextContent :: JSVal JSNode -> JSString -> IO ()
+        js_setTextContent :: JSVal -> JSString -> IO ()
 
-setTextContent :: (MonadIO m, IsJSNode self, ToJSString content) =>
+setTextContent :: (MonadIO m, IsJSNode self) =>
                   self
-               -> content
+               -> Text
                -> m ()
 setTextContent self content =
-    liftIO $ (js_setTextContent (unJSNode (toJSNode self)) (toJSString content))
--}
+    liftIO $ (js_setTextContent (unJSNode (toJSNode self)) (textToJSString content))
+
+foreign import javascript unsafe "$r = $1[\"textContent\"]"
+        js_getTextContent :: JSVal -> IO JSString
+
+getTextContent :: (MonadIO m, IsJSNode self) =>
+                  self
+               -> m Text
+getTextContent self =
+  liftIO $ (fmap textFromJSString $ js_getTextContent (unJSNode (toJSNode self)))
+
 
 -- * replaceData
 
@@ -834,7 +840,7 @@ foreign import javascript unsafe "$1[\"value\"]"
 
 getValue :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSString)
 getValue self
-  = liftIO ((js_getValue (toJSNode self)) >>= return . Just)
+  = liftIO ((js_getValue (toJSNode self)) >>= pure . Just)
 
 foreign import javascript unsafe "$1[\"value\"] = $2"
         js_setValue :: JSNode -> JSString -> IO ()
@@ -890,8 +896,22 @@ instance FromJSVal JSTextNode where
   fromJSVal = return . fmap JSTextNode . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
+instance PFromJSVal JSTextNode where
+  pFromJSVal = JSTextNode
+  {-# INLINE pFromJSVal #-}
+
+instance PToJSVal JSTextNode where
+  pToJSVal = unJSTextNode
+  {-# INLINE pToJSVal #-}
+
 instance IsJSNode JSTextNode where
     toJSNode = JSNode . unJSTextNode
+
+foreign import javascript unsafe "$1 instanceof Text"
+  js_instanceOfText :: JSVal -> Bool
+
+instance InstanceOf JSTextNode where
+  instanceOf a = js_instanceOfText (pToJSVal a)
 
 -- * isEqualNode
 
@@ -1030,6 +1050,7 @@ data DragEvent
   = Drag
   | DragEnd
   | DragEnter
+  | DragExit
   | DragLeave
   | DragOver
   | DragStart
@@ -1039,6 +1060,7 @@ data DragEvent
 instance IsEvent DragEvent where
   eventToJSString Drag = JS.pack "drag"
   eventToJSString DragEnd = JS.pack "dragend"
+  eventToJSString DragExit = JS.pack "dragexit"
   eventToJSString DragEnter = JS.pack "dragenter"
   eventToJSString DragLeave = JS.pack "dragleave"
   eventToJSString DragOver = JS.pack "dragover"
@@ -1941,6 +1963,12 @@ foreign import javascript unsafe "$1[\"setStart\"]($2,$3)"
 setStart :: (MonadIO m) => Range -> JSNode -> Int -> m ()
 setStart r n i = liftIO $ js_setStart r n i
 
+foreign import javascript unsafe "$1[\"setStartBefore\"]($2)"
+  js_setStartBefore :: Range -> JSNode -> IO ()
+
+setStartBefore :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
+setStartBefore r n = liftIO $ js_setStartBefore r (toJSNode n)
+
 foreign import javascript unsafe "$1[\"setEnd\"]($2,$3)"
   js_setEnd :: Range -> JSNode -> Int -> IO ()
 
@@ -2179,6 +2207,33 @@ setDataTransferData :: DataTransfer
                     -> JSString -- ^ data
                     -> IO ()
 setDataTransferData dataTransfer format data_ = (js_setDataTransferData dataTransfer format data_)
+
+-- * DataTransferItem
+
+newtype DataTransferItem = DataTransferItem { unDataTransferItem :: JSVal }
+
+instance Show DataTransferItem where
+  show _ = "DataTransferItem"
+
+instance ToJSVal DataTransferItem where
+  toJSVal = pure . unDataTransferItem
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal DataTransferItem where
+  fromJSVal = pure . fmap DataTransferItem . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+foreign import javascript unsafe "$1[\"kind\"]()" js_dataTransferItemKind ::
+        DataTransferItem -> JSString
+
+dataTransferItemKind :: DataTransferItem -> Text
+dataTransferItemKind dti = textFromJSString $ js_dataTransferItemKind dti
+
+foreign import javascript unsafe "$1[\"type\"]()" js_dataTransferItemType ::
+        DataTransferItem -> JSString
+
+dataTransferItemType :: DataTransferItem -> Text
+dataTransferItemType dti = textFromJSString $ js_dataTransferItemType dti
 
 -- * Clipboard
 
