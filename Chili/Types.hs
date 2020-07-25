@@ -1050,7 +1050,6 @@ data DragEvent
   = Drag
   | DragEnd
   | DragEnter
-  | DragExit
   | DragLeave
   | DragOver
   | DragStart
@@ -1060,7 +1059,6 @@ data DragEvent
 instance IsEvent DragEvent where
   eventToJSString Drag = JS.pack "drag"
   eventToJSString DragEnd = JS.pack "dragend"
-  eventToJSString DragExit = JS.pack "dragexit"
   eventToJSString DragEnter = JS.pack "dragenter"
   eventToJSString DragLeave = JS.pack "dragleave"
   eventToJSString DragOver = JS.pack "dragover"
