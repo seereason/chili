@@ -545,6 +545,12 @@ foreign import javascript unsafe "$1[\"innerHTML\"]"
 getInnerHTML :: (MonadIO m) => JSElement -> m JSString
 getInnerHTML element = liftIO $ js_getInnerHTML element
 
+foreign import javascript unsafe "$1[\"outerHTML\"] = $2"
+        js_setOuterHTML :: JSElement -> JSString -> IO ()
+
+setOuterHTML :: (MonadIO m) => JSElement -> JSString -> m ()
+setOuterHTML elm content = liftIO $ js_setOuterHTML elm content
+
 foreign import javascript unsafe "$1[\"outerHTML\"]"
         js_getOuterHTML :: JSElement -> IO JSString
 
@@ -1861,6 +1867,12 @@ foreign import javascript unsafe "$1[\"collapseToEnd\"]()"
 collapseToEnd :: (MonadIO m) => Selection -> m ()
 collapseToEnd s = liftIO (js_collapseToEnd s)
 
+foreign import javascript unsafe "$1[\"deleteFromDocument\"]()"
+  js_deleteFromDocument :: Selection -> IO ()
+
+deleteFromDocument :: (MonadIO m) => Selection -> m ()
+deleteFromDocument sel = liftIO $ js_deleteFromDocument sel
+
 foreign import javascript unsafe "$r = $1[\"isCollapsed\"]"
   js_isCollapsed :: Selection -> IO Bool
 
@@ -1958,8 +1970,8 @@ endOffset r = liftIO (js_endOffset r)
 foreign import javascript unsafe "$1[\"setStart\"]($2,$3)"
   js_setStart :: Range -> JSNode -> Int -> IO ()
 
-setStart :: (MonadIO m) => Range -> JSNode -> Int -> m ()
-setStart r n i = liftIO $ js_setStart r n i
+setStart :: (MonadIO m, IsJSNode node) => Range -> node -> Int -> m ()
+setStart r n i = liftIO $ js_setStart r (toJSNode n) i
 
 foreign import javascript unsafe "$1[\"setStartBefore\"]($2)"
   js_setStartBefore :: Range -> JSNode -> IO ()
