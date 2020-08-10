@@ -618,6 +618,34 @@ getElementById ::
 getElementById self ident =
   liftIO (nullableToMaybe <$> js_getElementsById self ident)
 
+-- * insertAdjacentElement
+
+-- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.insertBefore Mozilla Node.insertBefore documentation>
+
+foreign import javascript unsafe "$1[\"insertAdjacentElement\"]($2, $3)"
+        js_insertAdjacentElement :: JSNode -> JSString -> JSNode -> IO JSVal
+
+data AdjacentPosition
+  = BeforeBegin -- ^ Before the targetElement itself
+  | AfterBegin  -- ^ Just inside the targetElement, before its first child.
+  | BeforeEnd   -- ^ Just inside the targetElement, before its first child.
+  | AfterEnd    -- ^ After the targetElement itself.
+    deriving (Eq, Ord, Read, Show)
+
+insertAdjacentElement :: (MonadIO m, IsJSNode targetElement, IsJSNode newNode) =>
+               targetElement
+            -> AdjacentPosition
+            -> newNode
+            -> m (Maybe JSNode)
+insertAdjacentElement targetElement position newNode =
+  liftIO $ fromJSVal =<< (js_insertAdjacentElement (toJSNode targetElement) (domStr position) (toJSNode newNode))
+  where
+    domStr :: AdjacentPosition -> JSString
+    domStr BeforeBegin = "beforebegin"
+    domStr AfterBegin  = "afterbegin"
+    domStr BeforeEnd   = "beforeend"
+    domStr AfterEnd    = "afterend"
+
 -- * insertBefore
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.insertBefore Mozilla Node.insertBefore documentation>
