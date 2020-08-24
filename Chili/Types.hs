@@ -2402,3 +2402,43 @@ foreign import javascript unsafe "$1[\"srcObject\"] = $2"
 
 setSrcObject :: (MonadIO m, IsSrcObject o) => MediaElement -> o -> m ()
 setSrcObject me o = liftIO $ js_setSrcObject me (pToJSVal o)
+
+-- * DOMTokenList
+
+newtype DOMTokenList = DOMTokenList { unDOMTokenList :: JSVal }
+
+instance ToJSVal DOMTokenList where
+  toJSVal = return . unDOMTokenList
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal DOMTokenList where
+  fromJSVal = return . fmap DOMTokenList . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance PFromJSVal DOMTokenList where
+  pFromJSVal = DOMTokenList
+  {-# INLINE pFromJSVal #-}
+
+foreign import javascript unsafe "$1[\"add\"]($2)"
+        js_addToken1 :: DOMTokenList -> JSString -> IO ()
+
+addToken1 :: (MonadIO m) => DOMTokenList -> JSString -> m ()
+addToken1 dtl t = liftIO $ js_addToken1 dtl t
+
+foreign import javascript unsafe "$1[\"remove\"]($2)"
+        js_removeToken1 :: DOMTokenList -> JSString -> IO ()
+
+removeToken1 :: (MonadIO m) => DOMTokenList -> JSString -> m ()
+removeToken1 dtl t = liftIO $ js_removeToken1 dtl t
+
+foreign import javascript unsafe "$1[\"replace\"]($2)"
+        js_replaceToken :: DOMTokenList -> JSString -> JSString -> IO Bool
+
+replaceToken :: (MonadIO m) => DOMTokenList -> JSString -> JSString -> m Bool
+replaceToken dtl old new = liftIO $ js_replaceToken dtl old new
+
+foreign import javascript unsafe "$r = $1[\"classList\"]"
+        js_classList :: JSElement -> IO DOMTokenList
+
+classList :: (MonadIO m) => JSElement -> m DOMTokenList
+classList e = liftIO $ js_classList e
