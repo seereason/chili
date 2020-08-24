@@ -1,5 +1,5 @@
 name:                chili
-version:             0.1.3
+version:             0.1.4
 synopsis:            yet another clientside ui library
 description:         Model/View with components that emit browser events
 license:             BSD3
