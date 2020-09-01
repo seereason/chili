@@ -51,10 +51,6 @@ maybeJSNullOrUndefined :: JSVal -> Maybe JSVal
 maybeJSNullOrUndefined r | isNull r || isUndefined r = Nothing
 maybeJSNullOrUndefined r = Just r
 
-newtype EIO a = EIO { eioToIO :: IO a }
-  deriving (Functor, Applicative, Alternative, Monad, MonadPlus)
-
-
 class InstanceOf ty where
   instanceOf :: (PToJSVal a) => a -> Bool
 
@@ -78,7 +74,7 @@ foreign import javascript unsafe "alert($1)"
 
 -- * JSNode
 
-newtype JSNode = JSNode JSVal
+newtype JSNode = JSNode JSVal deriving Eq
 
 unJSNode (JSNode o) = o
 
@@ -193,6 +189,11 @@ getLength self
 -- foreign import javascript unsafe "$1[\"length\"]" js_getLength ::
 --         JSVal NodeList -> IO Word
 
+foreign import javascript unsafe "$1[\"contains\"]($2)"
+   js_contains :: JSNode -> JSNode -> IO Bool
+
+contains :: (IsJSNode node, IsJSNode otherNode, MonadIO m) => node -> otherNode -> m Bool
+contains node otherNode = liftIO $ js_contains (toJSNode node) (toJSNode otherNode)
 
 -- * parentNode
 
@@ -236,6 +237,47 @@ foreign import javascript unsafe "$1[\"nodeName\"]"
 nodeName :: (MonadIO m, IsJSNode self) => self -> m JSString
 nodeName self = liftIO (js_nodeName $ toJSNode self)
 
+-- * JSDocumentFragment
+
+newtype JSDocumentFragment = JSDocumentFragment { unJSDocumentFragment :: JSVal } deriving Eq
+
+instance ToJSVal JSDocumentFragment where
+  toJSVal = pure . unJSDocumentFragment
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal JSDocumentFragment where
+  fromJSVal = pure . fmap JSDocumentFragment . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance PFromJSVal JSDocumentFragment where
+  pFromJSVal = JSDocumentFragment
+  {-# INLINE pFromJSVal #-}
+
+instance PToJSVal JSDocumentFragment where
+  pToJSVal (JSDocumentFragment jsval) = jsval
+  {-# INLINE pToJSVal #-}
+
+instance IsJSNode JSDocumentFragment where
+    toJSNode = JSNode . unJSDocumentFragment
+
+instance IsEventTarget JSDocumentFragment where
+    toEventTarget = EventTarget . unJSDocumentFragment
+
+instance InstanceOf JSDocumentFragment where
+  instanceOf a = js_instanceOfJSDocumentFragment (pToJSVal a)
+
+foreign import javascript unsafe "$1 instanceof DocumentFragment"
+  js_instanceOfJSDocumentFragment :: JSVal -> Bool
+
+foreign import javascript unsafe "$1[\"firstElementChild\"]"
+        js_firstElementChild :: JSDocumentFragment -> IO JSVal
+
+firstElementChild :: (MonadIO m) => JSDocumentFragment -> m (Maybe JSElement)
+firstElementChild df
+  = liftIO ((js_firstElementChild df) >>= fromJSVal)
+
+
+
 -- * JSDocument
 
 newtype JSDocument = JSDocument JSVal
@@ -249,6 +291,14 @@ instance ToJSVal JSDocument where
 instance FromJSVal JSDocument where
   fromJSVal = pure . fmap JSDocument . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
+
+instance PFromJSVal JSDocument where
+  pFromJSVal = JSDocument
+  {-# INLINE pFromJSVal #-}
+
+instance PToJSVal JSDocument where
+  pToJSVal (JSDocument jsval) = jsval
+  {-# INLINE pToJSVal #-}
 
 instance IsJSNode JSDocument where
     toJSNode = JSNode . unJSDocument
@@ -303,6 +353,13 @@ foreign import javascript unsafe "$r = $1[\"querySelector\"]"
 
 querySelector :: (MonadIO m) => JSDocument -> JSString -> m (Maybe JSElement)
 querySelector d sel = liftIO $ fromJSVal =<< js_querySelector d sel
+
+foreign import javascript unsafe "$r = $1[\"body\"]"
+        js_body :: JSDocument -> IO JSVal
+
+
+body :: (MonadIO m) => JSDocument -> m (Maybe JSElement)
+body d = liftIO $ fromJSVal =<< js_body d
 
 -- | Commands for 'execCommand' and 'queryCommandState'
 data Command
@@ -557,6 +614,14 @@ foreign import javascript unsafe "$1[\"outerHTML\"]"
 getOuterHTML :: (MonadIO m) => JSElement -> m JSString
 getOuterHTML element = liftIO $ js_getOuterHTML element
 
+foreign import javascript unsafe "$r = $1[\"tagName\"]"
+  js_tagName :: JSElement -> IO JSString
+
+tagName :: (MonadIO m) => JSElement -> m Text
+tagName e =
+  do v <- liftIO $ js_tagName e
+     pure (textFromJSString v)
+
 -- * childNodes
 
 foreign import javascript unsafe "$1[\"childNodes\"]"
@@ -678,7 +743,15 @@ appendChild self newChild
           (maybe (JSNode jsNull) ( toJSNode) newChild))
          >>= return . Just)
 
-foreign import javascript unsafe "$1[\"focus\"]()" focus :: JSElement -> IO ()
+foreign import javascript unsafe "$1[\"focus\"]()" js_focus :: JSElement -> IO ()
+
+focus :: (MonadIO m) => JSElement -> m ()
+focus e = liftIO (js_focus e)
+
+foreign import javascript unsafe "$1[\"blur\"]()" js_blur :: JSElement -> IO ()
+
+blur :: (MonadIO m) => JSElement -> m ()
+blur e = liftIO (js_blur e)
 
 -- * textContent
 
@@ -760,6 +833,14 @@ replaceChild self newChild oldChild
                        ((toJSNode) oldChild)
          >>= return . Just)
 
+-- * replaceWith
+
+foreign import javascript unsafe "$1[\"replaceWith\"]($2)"
+        js_replaceWith :: JSNode -> JSNode -> IO ()
+
+replaceWith :: (IsJSNode oldNode, IsJSNode newNode, MonadIO m) => oldNode -> newNode -> m ()
+replaceWith old new = liftIO $ js_replaceWith (toJSNode old) (toJSNode new)
+
 -- * firstChild
 
 foreign import javascript unsafe "$1[\"firstChild\"]"
@@ -769,6 +850,20 @@ foreign import javascript unsafe "$1[\"firstChild\"]"
 getFirstChild :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
 getFirstChild self
   = liftIO ((js_getFirstChild ((toJSNode self))) >>= fromJSVal)
+
+firstChild :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
+firstChild = getFirstChild
+
+-- * lastChild
+
+foreign import javascript unsafe "$1[\"lastChild\"]"
+        js_lastChild :: JSNode -> IO JSVal
+
+-- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.firstChild Mozilla Node.firstChild documentation>
+lastChild :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
+lastChild self
+  = liftIO ((js_lastChild ((toJSNode self))) >>= fromJSVal)
+
 
 -- | remove all the children
 removeChildren
@@ -792,6 +887,15 @@ foreign import javascript unsafe "$1[\"nextSibling\"]"
 nextSibling :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
 nextSibling self
   = liftIO ((js_nextSibling ((toJSNode self))) >>= fromJSVal)
+
+
+foreign import javascript unsafe "$1[\"previousSibling\"]"
+        js_previousSibling :: JSNode -> IO JSVal
+
+-- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.previousSibling Mozilla Node.nextSibling documentation>
+previousSibling :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
+previousSibling self
+  = liftIO ((js_previousSibling ((toJSNode self))) >>= fromJSVal)
 
 
 foreign import javascript unsafe "$1[\"setAttribute\"]($2, $3)"
@@ -1862,6 +1966,8 @@ foreign import javascript unsafe "$1[\"rangeCount\"]"
 getRangeCount :: (MonadIO m) => Selection -> m Int
 getRangeCount selection = liftIO (js_getRangeCount selection)
 
+rangeCount :: (MonadIO m) => Selection -> m Int
+rangeCount = getRangeCount
 
 -- ** methods
 
@@ -1876,6 +1982,12 @@ foreign import javascript unsafe "$r = $1[\"anchorNode\"]"
 
 anchorNode :: (MonadIO m) => Selection -> m JSNode
 anchorNode s = liftIO (js_anchorNode s)
+
+foreign import javascript unsafe "$r = $1[\"anchorOffset\"]"
+  js_anchorOffset :: Selection -> IO Int
+
+anchorOffset :: (MonadIO m) => Selection -> m Int
+anchorOffset s = liftIO (js_anchorOffset s)
 
 foreign import javascript unsafe "$1[\"collapse\"]($2, $3)"
   js_collapse :: Selection -> JSNode -> Int -> IO ()
@@ -1946,6 +2058,24 @@ foreign import javascript unsafe "new Range()"
 newRange :: (MonadIO m) => m Range
 newRange = liftIO js_newRange
 
+foreign import javascript unsafe "$1[\"cloneContents\"]()"
+  js_cloneContents :: Range -> IO JSVal
+
+cloneContents :: (MonadIO m) => Range -> m JSDocumentFragment
+cloneContents r = liftIO $ pFromJSVal <$> js_cloneContents r
+
+foreign import javascript unsafe "$r = $1[\"commonAncestorContainer\"]"
+  js_commonAncestorContainer :: Range -> IO JSNode
+
+commonAncestorContainer :: (MonadIO m) => Range -> m JSNode
+commonAncestorContainer r = liftIO $ js_commonAncestorContainer r
+
+foreign import javascript unsafe "$1[\"deleteContents\"]()"
+  js_deleteContents :: Range -> IO ()
+
+deleteContents :: (MonadIO m) => Range -> m ()
+deleteContents r = liftIO $ js_deleteContents r
+
 foreign import javascript unsafe "$1[\"startContainer\"]"
         js_startContainer :: Range -> IO JSNode
 {-
@@ -1958,6 +2088,14 @@ createRange d = js_createRange d
 foreign import javascript unsafe "$1[\"selectNode\"]($2)"
   js_selectNode :: Range -> JSNode -> IO ()
 
+selectNode :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
+selectNode r n = liftIO (js_selectNode r (toJSNode n))
+
+foreign import javascript unsafe "$1[\"selectNodeContents\"]($2)"
+  js_selectNodeContents :: Range -> JSNode -> IO ()
+
+selectNodeContents :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
+selectNodeContents r n = liftIO (js_selectNodeContents r (toJSNode n))
 
 foreign import javascript unsafe "$1[\"insertNode\"]($2)"
   js_insertNode :: Range -> JSNode -> IO ()
@@ -1970,9 +2108,6 @@ foreign import javascript unsafe "$1[\"toString\"]()"
 
 rangeToJSString :: Range -> IO JSString
 rangeToJSString r = liftIO (js_rangeToString r)
-
-selectNode :: Range -> JSNode -> IO ()
-selectNode r n = js_selectNode r n
 
 startContainer :: (MonadIO m) => Range -> m JSNode
 startContainer r = liftIO (js_startContainer r)
@@ -2010,8 +2145,14 @@ setStartBefore r n = liftIO $ js_setStartBefore r (toJSNode n)
 foreign import javascript unsafe "$1[\"setEnd\"]($2,$3)"
   js_setEnd :: Range -> JSNode -> Int -> IO ()
 
-setEnd :: (MonadIO m) => Range -> JSNode -> Int -> m ()
-setEnd r n i = liftIO $ js_setEnd r n i
+setEnd :: (MonadIO m, IsJSNode node) => Range -> node -> Int -> m ()
+setEnd r n i = liftIO $ js_setEnd r (toJSNode n) i
+
+foreign import javascript unsafe "$1[\"setEndBefore\"]($2)"
+  js_setEndBefore :: Range -> JSNode -> IO ()
+
+setEndBefore :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
+setEndBefore r n = liftIO $ js_setEndBefore r (toJSNode n)
 
 newtype ClientRects = ClientRects { unClientRects :: JSVal }
 

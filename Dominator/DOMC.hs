@@ -79,6 +79,19 @@ We can have the restriction that the only children of `<ol>` are the elements cr
 
 Another option is to keep a dummy node -- perhaps the <list-function> element itself. That element can be set to 'display: none'.
 
+How would conditionals work? Or even crazier, pattern matching?
+
+One tricky bit is that the different cases could have different templates. So, we need to track across updates if we have switched branches or not. `if` statements seem the most straight-forward since there are always exactly two options and they do not bring any new variables into scope.
+
+A case statement with nullary constructors would be a simple extension of that.
+
+What about a case statement which binds additional variables?
+
+
+Optimizations:
+
+HTML 5 has a built-in concept of templates. Can we use those to avoid having to call genElement and friends ourselves?
+
 -}
 
 import Control.Monad.Trans (liftIO)
