@@ -82,8 +82,7 @@ type instance EventObjectOf (CustomEvent 'MyEvent2)   = CustomEventObject 'MyEve
 ```
 
 This tells the compiler that for `'MyEvent1` it is going to need a
-handler for the type `CustomEventObject 'MyEvent1 Text`. The `Text`
-will be the type of the `detail`.
+handler for the type `CustomEventObject 'MyEvent1 Text`. The `Text` paramater specifies that the `detail` will be type `Text`.
 
 With the above instances, you could not have a single handler that works for any `MyEvent` because each constructor maps to a unique `CustomEventObject` type. It would be possible to have them all resolve to the same type:
 
@@ -92,7 +91,7 @@ type instance EventObjectOf (CustomEvent 'MyEvent1)   = CustomEventObject 'MyEve
 type instance EventObjectOf (CustomEvent 'MyEvent2)   = CustomEventObject 'MyEvent Text
 ```
 
-To add an event listener we just create handler and use `addEventListener`
+To add an event listener we just define a handler function and use `addEventListener`
 
 ```
 myEvent1Handler :: CustomEventObject 'EditorAppendEvent Text -> IO ()
@@ -120,10 +119,10 @@ Once we have our CustomEvent we can use the standard `dispatchEvent` function:
 
 That is the same `dispatchEvent` function which is used for built-in
 events like `MouseEvent`, `KeyboardEvent`, etc. The only difference is
-that we use `newCustomeEvent` instead of `newEvent` to create the
+that we use `newCustomEvent` instead of `newEvent` to create the
 object.
 
-If we do not want to create a custom data type we can just use symbols,
+If we do not want to create a custom data type we can just use `Symbols`,
 
 ```
 foobarHandler :: CustomEventObject "foobar" Text -> IO ()
@@ -146,3 +145,11 @@ Note that we still use `EventObjectOf` to ensure that type for
 `detail` is consistent between `newCustomEvent`, `addEventListener`,
 and `foobarHandler` for the custom `"foobar"` event.
 
+To get the detail, we just use the detail function and pass it the `CustomEventObject`:
+
+```
+detail :: (FromJSVal a) => CustomEventObject e a -> IO (Maybe a)
+detail e =
+```
+
+The `detail` can be any value with 'ToJSVal`/`FromJSVal` instances.
