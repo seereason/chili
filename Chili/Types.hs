@@ -1,6 +1,6 @@
 {-# LANGUAGE ConstrainedClassMethods, ExistentialQuantification, FlexibleContexts, FlexibleInstances, GADTs, JavaScriptFFI, ScopedTypeVariables, TypeFamilies #-}
 {-# language GeneralizedNewtypeDeriving, TypeApplications, AllowAmbiguousTypes, OverloadedStrings #-}
-{-# language RankNTypes #-}
+{-# language RankNTypes, DataKinds, KindSignatures, PolyKinds #-}
 module Chili.Types where
 
 import Control.Applicative (Applicative, Alternative)
@@ -29,6 +29,7 @@ import Data.JSString.Text (textToJSString, textFromJSString)
 import qualified Data.Text as Text
 -- import GHCJS.Prim (ToJSString(..), FromJSString(..))
 -- import JavaScript.TypedArray.ArrayBuffer (ArrayBuffer)
+import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 import GHCJS.Buffer
 import GHCJS.Foreign (jsNull)
 import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
@@ -94,7 +95,6 @@ instance PToJSVal JSNode where
   pToJSVal (JSNode jsval) = jsval
   {-# INLINE pToJSVal #-}
 
-
 -- | is this legit?
 instance IsEventTarget JSNode where
   toEventTarget = EventTarget . unJSNode
@@ -118,6 +118,22 @@ fromJSNode jsnode@(JSNode jsval) =
       if instanceOf @o jsnode
       then Just (pFromJSVal jsval)
       else Nothing
+
+-- * IsJSNode
+
+class (IsJSNode obj) => IsParentNode obj
+
+instance IsParentNode JSElement
+instance IsParentNode JSDocument
+instance IsParentNode JSDocumentFragment
+
+foreign import javascript unsafe "$1[\"append\"]($2)"
+  js_append :: JSNode -> JSVal -> IO ()
+
+appendNodeList :: (IsParentNode parent, MonadIO m) => parent -> JSNodeList -> m ()
+appendNodeList parent nl = liftIO $
+  do nlv <- toJSVal nl
+     js_append (toJSNode parent) nlv
 
 -- * EventTarget
 
@@ -1302,6 +1318,7 @@ instance IsEvent ElementScrollEvent where
 -- https://developer.mozilla.org/en-US/docs/Web/API/ProgressEvent
 -- data ProgressEvent =
 
+-- | FIXME: is this type used anymore? Probably remove it.
 data EventType
   = MouseEvent MouseEvent
   | KeyboardEvent KeyboardEvent
@@ -1539,33 +1556,41 @@ type instance EventObjectOf SelectionEvent = SelectionEventObject
 type instance EventObjectOf DragEvent      = DragEventObject
 type instance EventObjectOf ElementScrollEvent = ElementScrollEventObject
 
--- * DOMRect
+-- * CustomEvent
 
-newtype DOMClientRect = DomClientRect { unDomClientRect :: JSVal }
+data CustomEvent (e :: k) = CustomEvent
 
-foreign import javascript unsafe "$1[\"width\"]" width ::
-         DOMClientRect -> Double
+instance KnownSymbol e => IsEvent (CustomEvent e) where
+  eventToJSString (CustomEvent {}) = JS.pack $ symbolVal (Proxy :: Proxy e)
 
-foreign import javascript unsafe "$1[\"top\"]" rectTop ::
-         DOMClientRect -> Double
+newtype CustomEventObject (e :: k) a = CustomEventObject { unCustomEventObject :: JSVal }
 
-foreign import javascript unsafe "$1[\"left\"]" rectLeft ::
-         DOMClientRect -> Double
+instance ToJSVal (CustomEventObject e a) where
+  toJSVal = return . unCustomEventObject
+  {-# INLINE toJSVal #-}
 
-foreign import javascript unsafe "$1[\"right\"]" rectRight ::
-         DOMClientRect -> Double
+instance FromJSVal (CustomEventObject e a) where
+  fromJSVal = return . fmap CustomEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
 
-foreign import javascript unsafe "$1[\"bottom\"]" rectBottom ::
-         DOMClientRect -> Double
+instance IsEventObject (CustomEventObject e a) where
+  asEventObject (CustomEventObject jsval) = EventObject jsval
 
-foreign import javascript unsafe "$1[\"height\"]" height ::
-         DOMClientRect -> Double
+foreign import javascript unsafe "new CustomEvent($1, { 'detail': $2, 'bubbles' : $3, 'cancelable' : $4})"
+        js_newCustomEvent :: JSString -> JSVal -> Bool -> Bool -> IO JSVal
 
-foreign import javascript unsafe "$1[\"getBoundingClientRect\"]()" js_getBoundingClientRect ::
-  JSElement -> IO DOMClientRect
+newCustomEvent :: (IsEvent (CustomEvent ev), FromJSVal a, ToJSVal a) => CustomEvent ev -> Maybe a -> Bool -> Bool -> IO (CustomEventObject ev a)
+newCustomEvent ev detail bubbles cancelable =
+  do let evStr = eventToJSString ev
+     d <- toJSVal detail
+     jsval <- js_newCustomEvent evStr d bubbles cancelable
+     pure $ CustomEventObject jsval
 
-getBoundingClientRect :: (MonadIO m) => JSElement -> m DOMClientRect
-getBoundingClientRect = liftIO . js_getBoundingClientRect
+foreign import javascript unsafe "$r = $1[\"detail\"]"
+        js_detail :: CustomEventObject e a -> JSVal
+
+detail :: (FromJSVal a) => CustomEventObject e a -> IO (Maybe a)
+detail ceo = fromJSVal $ js_detail ceo
 
 -- * addEventListener
 
@@ -1622,6 +1647,36 @@ addEventListener self type' listener useCapture
                           EventTxt s -> s
 
 -}
+
+
+-- * DOMRect
+
+newtype DOMClientRect = DomClientRect { unDomClientRect :: JSVal }
+
+foreign import javascript unsafe "$1[\"width\"]" width ::
+         DOMClientRect -> Double
+
+foreign import javascript unsafe "$1[\"top\"]" rectTop ::
+         DOMClientRect -> Double
+
+foreign import javascript unsafe "$1[\"left\"]" rectLeft ::
+         DOMClientRect -> Double
+
+foreign import javascript unsafe "$1[\"right\"]" rectRight ::
+         DOMClientRect -> Double
+
+foreign import javascript unsafe "$1[\"bottom\"]" rectBottom ::
+         DOMClientRect -> Double
+
+foreign import javascript unsafe "$1[\"height\"]" height ::
+         DOMClientRect -> Double
+
+foreign import javascript unsafe "$1[\"getBoundingClientRect\"]()" js_getBoundingClientRect ::
+  JSElement -> IO DOMClientRect
+
+getBoundingClientRect :: (MonadIO m) => JSElement -> m DOMClientRect
+getBoundingClientRect = liftIO . js_getBoundingClientRect
+
 -- * XMLHttpRequest
 newtype XMLHttpRequest = XMLHttpRequest { unXMLHttpRequest :: JSVal }
 
@@ -2583,3 +2638,4 @@ foreign import javascript unsafe "$r = $1[\"classList\"]"
 
 classList :: (MonadIO m) => JSElement -> m DOMTokenList
 classList e = liftIO $ js_classList e
+
