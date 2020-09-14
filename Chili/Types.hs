@@ -1,6 +1,8 @@
 {-# LANGUAGE ConstrainedClassMethods, ExistentialQuantification, FlexibleContexts, FlexibleInstances, GADTs, JavaScriptFFI, ScopedTypeVariables, TypeFamilies #-}
 {-# language GeneralizedNewtypeDeriving, TypeApplications, AllowAmbiguousTypes, OverloadedStrings #-}
-{-# language RankNTypes, DataKinds, KindSignatures, PolyKinds #-}
+{-# language RankNTypes, DataKinds, KindSignatures, PolyKinds, TypeFamilyDependencies #-}
+{-# language PatternSynonyms, UndecidableInstances #-}
+{-# language MultiParamTypeClasses #-}
 module Chili.Types where
 
 import Control.Applicative (Applicative, Alternative)
@@ -17,7 +19,6 @@ import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TMVar (TMVar, putTMVar, takeTMVar)
 import Data.Aeson (FromJSON, ToJSON, decodeStrict, encode)
 import qualified Data.ByteString.Lazy.Char8 as C
-import Data.Aeson.Types (Parser, Result(..), parse)
 import Data.Char as Char (toLower)
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Monoid ((<>))
@@ -37,7 +38,7 @@ import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
 import GHCJS.Marshal.Pure (PToJSVal(pToJSVal), PFromJSVal(pFromJSVal))
 import GHCJS.Nullable (Nullable(..), nullableToMaybe, maybeToNullable)
 import GHCJS.Types (IsJSVal(..), JSVal(..), JSString(..),  nullRef, isNull, isUndefined)
-import JavaScript.Web.MessageEvent (MessageEvent(..), MessageEventData(..))
+import qualified JavaScript.Web.MessageEvent (MessageEvent(..), MessageEventData(..))
 import qualified JavaScript.Web.MessageEvent as MessageEvent
 import qualified JavaScript.Web.WebSocket as WebSockets
 import JavaScript.Web.WebSocket (WebSocket, WebSocketRequest(..), connect, send)
@@ -1103,21 +1104,56 @@ setNodeValue node val = liftIO $ js_setNodeValue node val
 
 -- * Events
 
+-- All EventObjects listed here https://developer.mozilla.org/en-US/docs/Web/API/Event
+--                              https://developer.mozilla.org/en-US/docs/Web/Events
+
 instance IsEventTarget JSElement where
     toEventTarget = EventTarget . unJSElement
+
+-- | this type family maps types to unique symbols. Th compiler
+-- enforces that RHS *must* uniquely identify the LHS.
+type family UniqEventName (e :: k) = (s :: Symbol) | s -> e
+
+-- | This is just 'Proxy' by a different name
+data EventName (ev :: k) = EventName
+
+-- | Return the event name (aka, event.type) as a 'String'.
+--
+-- The 'String' is determined by using 'UniqEventName' to convert `ev`
+-- to a 'Symbol' and then converting the 'Symbol' to a 'String'.
+eventName :: forall ev. (KnownSymbol (UniqEventName ev)) => EventName ev -> String
+eventName _ = symbolVal (Proxy :: Proxy (UniqEventName ev))
+
+-- | helper function so you can use TypeApplication with addEventListener
+--
+-- Instead of this:
+--
+--     addEventLister (EventName :: EventName Click) clickHandler True
+--
+-- you can write this:
+--
+--     addEventLister (ev @Click) clickHandler True
+--
+ev :: forall ev. (KnownSymbol (UniqEventName ev)) => EventName ev
+ev = EventName
 
 class IsEvent ev where
   eventToJSString :: ev -> JSString
 
 data Event
-  = ReadyStateChange
+  = LanguageChange
+  | Open
+  | ReadyStateChange
   deriving (Eq, Show, Read)
 
-instance IsEvent Event where
-  eventToJSString ReadyStateChange = JS.pack "readystatechange"
+type instance UniqEventName LanguageChange   = "languagechange"
+type instance UniqEventName Open             = "open"
+type instance UniqEventName ReadyStateChange = "readystatechange"
+
 
 data MouseEvent
-  = Click
+  = AuxClick
+  | Click
   | ContextMenu
   | DblClick
   | MouseDown
@@ -1128,6 +1164,18 @@ data MouseEvent
   | MouseOut
   | MouseUp
     deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+type instance UniqEventName AuxClick    = "auxclick"
+type instance UniqEventName Click       = "click"
+type instance UniqEventName ContextMenu = "contextmenu"
+type instance UniqEventName DblClick    = "dblclick"
+type instance UniqEventName MouseDown   = "mousedown"
+type instance UniqEventName MouseEnter  = "mouseenter"
+type instance UniqEventName MouseLeave  = "mouseleave"
+type instance UniqEventName MouseMove   = "mousemove"
+type instance UniqEventName MouseOver   = "mouseover"
+type instance UniqEventName MouseOut    = "mouseout"
+type instance UniqEventName MouseUp     = "mouseup"
 
 instance IsEvent MouseEvent where
   eventToJSString Click       = JS.pack "click"
@@ -1141,45 +1189,202 @@ instance IsEvent MouseEvent where
   eventToJSString MouseOut    = JS.pack "mouseout"
   eventToJSString MouseUp     = JS.pack "mouseup"
 
-data KeyboardEvent
-  = KeyDown
-  | KeyPress
-  | KeyUp
+-- * HashChangeEvent
+
+data HashChangeEvent
+  = HashChange
     deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
-instance IsEvent KeyboardEvent where
-  eventToJSString KeyDown  = JS.pack "keydown"
-  eventToJSString KeyPress = JS.pack "keypress"
-  eventToJSString KeyUp    = JS.pack "keyup"
+type instance UniqEventName HashChange      = "hashchange"
 
-data FrameEvent
-  = FrameAbort
+-- * HashChangeEventObject
+
+newtype HashChangeEventObject (ev :: HashChangeEvent) = HashChangeEventObject { unHashChangeEventObject :: JSVal }
+
+instance Show (HashChangeEventObject ev) where
+  show _ = "HashChangeEventObject"
+
+instance ToJSVal (HashChangeEventObject ev) where
+  toJSVal = return . unHashChangeEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal (HashChangeEventObject ev) where
+  fromJSVal = return . fmap HashChangeEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject (HashChangeEventObject ev) where
+  type Ev (HashChangeEventObject ev) = ev
+  asEventObject (HashChangeEventObject jsval) = EventObject jsval
+
+
+-- * PrintingEvent
+
+data PrintingEvent
+  = AfterPrint
+  | BeforePrint
+    deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+type instance UniqEventName AfterPrint         = "afterprint"
+type instance UniqEventName BeforePrint        = "beforeprint"
+
+
+-- | https://developer.mozilla.org/en-US/docs/Web/API/PromiseRejectionEvent
+
+data PromiseRejectionEvent
+  = RejectionHandled
+  | UnhandledRejection
+    deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+type instance UniqEventName RejectionHandled   = "rejectionhandled"
+type instance UniqEventName UnhandledRejection = "unhandledrejection"
+
+-- * PromiseRejectionEventObject
+
+newtype PromiseRejectionEventObject (ev :: PromiseRejectionEvent) = PromiseRejectionEventObject { unPromiseRejectionEventObject :: JSVal }
+
+instance Show (PromiseRejectionEventObject ev) where
+  show _ = "PromiseRejectionEventObject"
+
+instance ToJSVal (PromiseRejectionEventObject ev) where
+  toJSVal = return . unPromiseRejectionEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal (PromiseRejectionEventObject ev) where
+  fromJSVal = return . fmap PromiseRejectionEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject (PromiseRejectionEventObject ev) where
+  type Ev (PromiseRejectionEventObject ev) = ev
+  asEventObject (PromiseRejectionEventObject jsval) = EventObject jsval
+
+
+-- * ResourceEvent
+
+data ResourceEvent
+  = Error
+  | Abort
+  | Load
   | BeforeUnload
-  | FrameError
-  | HashChange
-  | FrameLoad
-  | PageShow
-  | PageHide
-  | Resize
-  | Scroll
   | Unload
     deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
-instance IsEvent FrameEvent where
-  eventToJSString = JS.pack . map Char.toLower . show
+type instance UniqEventName Error        = "error"
+type instance UniqEventName Abort        = "abort"
+type instance UniqEventName Load         = "load"
+type instance UniqEventName BeforeUnload = "beforeunload"
+type instance UniqEventName Unload       = "unload"
 
-data FocusEvent
-  = Blur
-  | Focus
-  | FocusIn  -- bubbles
-  | FocusOut -- bubbles
+-- * MessageEvent
+
+data MessageEvent
+  = Message
+  | MessageError
     deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
-instance IsEvent FocusEvent where
-  eventToJSString Blur     = JS.pack "blur"
-  eventToJSString Focus    = JS.pack "focus"
-  eventToJSString FocusIn  = JS.pack "focusin"
-  eventToJSString FocusOut = JS.pack "focusout"
+type instance UniqEventName Message      = "message"
+type instance UniqEventName MessageError = "messageerror"
+
+-- * MessageEventObject
+
+newtype MessageEventObject (ev :: MessageEvent) = MessageEventObject { unMessageEventObject :: JSVal }
+
+instance Show (MessageEventObject ev) where
+  show _ = "MessageEventObject"
+
+instance ToJSVal (MessageEventObject ev) where
+  toJSVal = return . unMessageEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal (MessageEventObject ev) where
+  fromJSVal = return . fmap MessageEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject (MessageEventObject ev) where
+  type Ev (MessageEventObject ev) = ev
+  asEventObject (MessageEventObject jsval) = EventObject jsval
+
+-- * NetworkEvent
+
+data NetworkEvent
+  = Online
+  | Offline
+    deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+type instance UniqEventName Online  = "online"
+type instance UniqEventName Offline = "offline"
+
+-- * ViewEvent
+
+data ViewEvent
+  = FullScreenChange
+  | FullScreenError
+  | Resize
+  | Scroll
+    deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+type instance UniqEventName FullScreenChange = "fullscreenchange"
+type instance UniqEventName FullScreenError  = "fullscreenerror"
+type instance UniqEventName Resize           = "resize"
+type instance UniqEventName Scroll           = "scroll"
+
+-- * PageTransitionEvent
+
+data PageTransitionEvent
+  = PageShow
+  | PageHide
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+type instance UniqEventName PageShow     = "pageshow"
+type instance UniqEventName PageHide     = "pagehide"
+
+-- * PageTransitionEventObject
+
+newtype PageTransitionEventObject (ev :: PageTransitionEvent) = PageTransitionEventObject { unPageTransitionEventObject :: JSVal }
+
+instance Show (PageTransitionEventObject ev) where
+  show _ = "PageTransitionEventObject"
+
+instance ToJSVal (PageTransitionEventObject ev) where
+  toJSVal = return . unPageTransitionEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal (PageTransitionEventObject ev) where
+  fromJSVal = return . fmap PageTransitionEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject (PageTransitionEventObject ev) where
+  type Ev (PageTransitionEventObject ev) = ev
+  asEventObject (PageTransitionEventObject jsval) = EventObject jsval
+
+-- * PopStateEvent
+
+data PopStateEvent
+  = PopState
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+type instance UniqEventName PopState     = "popstate"
+
+-- * PopStateEventObject
+
+newtype PopStateEventObject (ev :: PopStateEvent) = PopStateEventObject { unPopStateEventObject :: JSVal }
+
+instance Show (PopStateEventObject ev) where
+  show _ = "PopStateEventObject"
+
+instance ToJSVal (PopStateEventObject ev) where
+  toJSVal = return . unPopStateEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal (PopStateEventObject ev) where
+  fromJSVal = return . fmap PopStateEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject (PopStateEventObject ev) where
+  type Ev (PopStateEventObject ev) = ev
+  asEventObject (PopStateEventObject jsval) = EventObject jsval
+
+
+-- * FormEvent
 
 data FormEvent
   = Change
@@ -1200,29 +1405,13 @@ instance IsEvent FormEvent where
 --  eventToJSString Select   = JS.pack "select"
   eventToJSString Submit   = JS.pack "submit"
 
-data DragEvent
-  = Drag
-  | DragEnd
-  | DragEnter
-  | DragLeave
-  | DragOver
-  | DragStart
-  | Drop
-  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+type instance UniqEventName Change  = "change"
+type instance UniqEventName Input   = "input"
+type instance UniqEventName Invalid = "invalid"
+type instance UniqEventName Reset   = "reset"
+type instance UniqEventName Submit  = "submit"
 
-instance IsEvent DragEvent where
-  eventToJSString Drag = JS.pack "drag"
-  eventToJSString DragEnd = JS.pack "dragend"
-  eventToJSString DragEnter = JS.pack "dragenter"
-  eventToJSString DragLeave = JS.pack "dragleave"
-  eventToJSString DragOver = JS.pack "dragover"
-  eventToJSString DragStart = JS.pack "dragstart"
-  eventToJSString Drop = JS.pack "drop"
-
-data PrintEvent
-  = AfterPrint
-  | BeforePrint
-  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+-- * MediaEvent
 
 data MediaEvent
   = CanPlay
@@ -1246,51 +1435,63 @@ data MediaEvent
   | Waiting
   deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
-data ProgressEvent
-  = LoadStart
-  | Progress
-  | ProgressAbort
-  | ProgressError
-  | ProgressLoad
-  | Timeout
-  | LoadEnd
-  deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
-instance IsEvent ProgressEvent where
-  eventToJSString LoadStart     = JS.pack "loadstart"
-  eventToJSString Progress      = JS.pack "progress"
-  eventToJSString ProgressAbort = JS.pack "abort"
-  eventToJSString ProgressError = JS.pack "error"
-  eventToJSString ProgressLoad  = JS.pack "load"
-  eventToJSString Timeout       = JS.pack "timeout"
-  eventToJSString LoadEnd       = JS.pack "loadend"
+type instance UniqEventName CanPlay        = "canplay"
+type instance UniqEventName CanPlayThrough = "canplaythrough"
+type instance UniqEventName DurationChange = "durationchange"
+type instance UniqEventName Emptied        = "emptied"
+type instance UniqEventName Ended          = "ended"
+type instance UniqEventName MediaError     = "mediaerror"
+type instance UniqEventName LoadedData     = "loadeddata"
+type instance UniqEventName LoadedMetaData = "loadedmetadata"
+type instance UniqEventName Pause          = "pause"
+type instance UniqEventName Play           = "play"
+type instance UniqEventName Playing        = "playing"
+type instance UniqEventName RateChange     = "ratechange"
+type instance UniqEventName Seeked         = "seeked"
+type instance UniqEventName Seeking        = "seeking"
+type instance UniqEventName Stalled        = "stalled"
+type instance UniqEventName Suspend        = "suspend"
+type instance UniqEventName TimeUpdate     = "timeupdate"
+type instance UniqEventName VolumeChange   = "volumechange"
+type instance UniqEventName Waiting        = "waiting"
+
+-- * AnimationEvent
 
 data AnimationEvent
-  = AnimationEnd
-  | AnimationInteration
-  | AnimationStart
+  = AnimationStart
+  | AnimationCancel
+  | AnimationEnd
+  | AnimationIteration
   deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
-data TransitionEvent
-  = TransitionEnd
-  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+type instance UniqEventName AnimationStart     = "animationstart"
+type instance UniqEventName AnimationCancel    = "animationcancel"
+type instance UniqEventName AnimationEnd       = "animationend"
+type instance UniqEventName AnimationIteration = "animationiteration"
 
-data ServerSentEvent
-  = ServerError
-  | ServerMessage
-  | Open
-    deriving (Eq, Ord, Show, Read, Enum, Bounded)
+-- * AnimationEventObject
 
-data MiscEvent
-  = MiscMessage
-  | Online
-  | Offline
-  | PopState
-  | MiscShow
-  | Storage
-  | Toggle
-  | Wheel
-  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+newtype AnimationEventObject (ev :: AnimationEvent) = AnimationEventObject { unAnimationEventObject :: JSVal }
+
+instance Show (AnimationEventObject ev) where
+  show _ = "AnimationEventObject"
+
+instance ToJSVal (AnimationEventObject ev) where
+  toJSVal = return . unAnimationEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal (AnimationEventObject ev) where
+  fromJSVal = return . fmap AnimationEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject (AnimationEventObject ev) where
+  type Ev (AnimationEventObject ev) = ev
+  asEventObject (AnimationEventObject jsval) = EventObject jsval
+
+
+
+-- * TouchEvent
 
 data TouchEvent
   = TouchCancel
@@ -1299,94 +1500,188 @@ data TouchEvent
   | TouchStart
   deriving (Eq, Ord, Show, Read)
 
+type instance UniqEventName TouchCancel = "touchcancel"
+type instance UniqEventName TouchEnd    = "touchend"
+type instance UniqEventName TouchMove   = "touchmove"
+type instance UniqEventName TouchStart  = "touchstart"
+
+-- * TouchEventObject
+
+newtype TouchEventObject (ev :: TouchEvent) = TouchEventObject { unTouchEventObject :: JSVal }
+
+instance Show (TouchEventObject ev) where
+  show _ = "TouchEventObject"
+
+instance ToJSVal (TouchEventObject ev) where
+  toJSVal = return . unTouchEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal (TouchEventObject ev) where
+  fromJSVal = return . fmap TouchEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject (TouchEventObject ev) where
+  type Ev (TouchEventObject ev) = ev
+  asEventObject (TouchEventObject jsval) = EventObject jsval
+
+-- * TransitionEvent
+
+data TransitionEvent
+  = TransitionCancel
+  | TransitionEnd
+  | TransitionRun
+  | TransitionStart
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+type instance UniqEventName TransitionCancel = "transitioncancel"
+type instance UniqEventName TransitionEnd    = "transitionend"
+type instance UniqEventName TransitionRun    = "transitionrun"
+type instance UniqEventName TransitionStart  = "transitionstart"
+
+-- * TransitionEventObject
+
+newtype TransitionEventObject (ev :: TransitionEvent) = TransitionEventObject { unTransitionEventObject :: JSVal }
+
+instance Show (TransitionEventObject ev) where
+  show _ = "TransitionEventObject"
+
+instance ToJSVal (TransitionEventObject ev) where
+  toJSVal = return . unTransitionEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal (TransitionEventObject ev) where
+  fromJSVal = return . fmap TransitionEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject (TransitionEventObject ev) where
+  type Ev (TransitionEventObject ev) = ev
+  asEventObject (TransitionEventObject jsval) = EventObject jsval
+
+-- * SelectionEvent
+
 data SelectionEvent
-  = SelectionStart
+  = Select
+  | SelectStart
   | SelectionChange
   deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
+type instance UniqEventName Select          = "select"
+type instance UniqEventName SelectStart     = "selectstart"
+type instance UniqEventName SelectionChange = "selectionchange"
+
 instance IsEvent SelectionEvent where
-  eventToJSString SelectionStart  = JS.pack "selectionstart"
+  eventToJSString SelectStart     = JS.pack "selectstart"
   eventToJSString SelectionChange = JS.pack "selectionchange"
 
-data ElementScrollEvent
-  = ElementScroll
+-- * StorageEvent
+
+data StorageEvent
+  = Storage
   deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
-instance IsEvent ElementScrollEvent where
-  eventToJSString ElementScroll  = JS.pack "scroll"
+type instance UniqEventName Storage = "storage"
 
--- https://developer.mozilla.org/en-US/docs/Web/API/ProgressEvent
--- data ProgressEvent =
+-- * StorageEventObject
 
--- | FIXME: is this type used anymore? Probably remove it.
-data EventType
-  = MouseEvent MouseEvent
-  | KeyboardEvent KeyboardEvent
-  | FrameEvent FrameEvent
-  | FormEvent FormEvent
-  | DragEvent DragEvent
-  | ClipboardEvent ClipboardEvent
-  | PrintEvent PrintEvent
-  | MediaEvent MediaEvent
-  | AnimationEvent AnimationEvent
-  | TransitionEvent TransitionEvent
-  | ServerSentEvent ServerSentEvent
-  | MiscEvent MiscEvent
-  | TouchEvent TouchEvent
-  | SelectionEvent SelectionEvent
-  | ElementScrollEvent ElementScrollEvent
-  deriving (Eq, Ord, Show, Read)
+newtype StorageEventObject (ev :: StorageEvent) = StorageEventObject { unStorageEventObject :: JSVal }
+
+instance Show (StorageEventObject ev) where
+  show _ = "StorageEventObject"
+
+instance ToJSVal (StorageEventObject ev) where
+  toJSVal = return . unStorageEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal (StorageEventObject ev) where
+  fromJSVal = return . fmap StorageEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject (StorageEventObject ev) where
+  type Ev (StorageEventObject ev) = ev
+  asEventObject (StorageEventObject jsval) = EventObject jsval
+
+-- * WheelEvent
+
+data WheelEvent
+  = Wheel
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+type instance UniqEventName Wheel          = "wheel"
+
+-- * WheelEventObject
+
+newtype WheelEventObject (ev :: WheelEvent) = WheelEventObject { unWheelEventObject :: JSVal }
+
+instance Show (WheelEventObject ev) where
+  show _ = "WheelEventObject"
+
+instance ToJSVal (WheelEventObject ev) where
+  toJSVal = return . unWheelEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal (WheelEventObject ev) where
+  fromJSVal = return . fmap WheelEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject (WheelEventObject ev) where
+  type Ev (WheelEventObject ev) = ev
+  asEventObject (WheelEventObject jsval) = EventObject jsval
+
+
+
 -- * Event Objects
 
 -- http://www.w3schools.com/jsref/dom_obj_event.asp
 
 class IsEventObject obj where
-  asEventObject        :: obj -> EventObject
+  type Ev obj :: k
+  asEventObject        :: obj -> EventObject (Ev obj)
 
 -- * EventObject
 
-newtype EventObject = EventObject { unEventObject :: JSVal }
+newtype EventObject (ev :: k) = EventObject { unEventObject :: JSVal }
 
-instance Show EventObject where
+instance Show (EventObject ev) where
   show _ = "EventObject"
 
-instance ToJSVal EventObject where
+instance ToJSVal (EventObject ev) where
   toJSVal = return . unEventObject
   {-# INLINE toJSVal #-}
 
-instance FromJSVal EventObject where
+instance FromJSVal (EventObject ev) where
   fromJSVal = return . fmap EventObject . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
-instance IsEventObject EventObject where
-  asEventObject = id
+instance IsEventObject (EventObject ev) where
+  type Ev (EventObject ev) = ev
+  asEventObject (EventObject jsval) = EventObject jsval
 
 foreign import javascript unsafe "$1[\"defaultPrevented\"]" js_defaultPrevented ::
-        EventObject -> IO Bool
+        EventObject ev -> IO Bool
 
 defaultPrevented :: (IsEventObject obj, MonadIO m) => obj -> m Bool
 defaultPrevented obj = liftIO (js_defaultPrevented (asEventObject obj))
 
 foreign import javascript unsafe "$1[\"currentTarget\"]" js_currentTarget ::
-        EventObject -> EventTarget
+        EventObject ev -> EventTarget
 
 currentTarget :: (IsEventObject obj) => obj -> EventTarget
 currentTarget obj = js_currentTarget (asEventObject obj)
 
 foreign import javascript unsafe "$1[\"target\"]" js_target ::
-        EventObject -> EventTarget
+        EventObject ev -> EventTarget
 
 target :: (IsEventObject obj) => obj -> EventTarget
 target obj = js_target (asEventObject obj)
 
 foreign import javascript unsafe "$1[\"preventDefault\"]()" js_preventDefault ::
-        EventObject -> IO ()
+        EventObject ev -> IO ()
 
 preventDefault :: (IsEventObject obj) => obj -> IO ()
 preventDefault obj = (js_preventDefault (asEventObject obj))
 
 foreign import javascript unsafe "$1[\"stopPropagation\"]()" js_stopPropagation ::
-        EventObject -> IO ()
+        EventObject ev -> IO ()
 
 -- stopPropagation :: (IsEventObject obj, MonadIO m) => obj -> m ()
 stopPropagation :: (IsEventObject obj) => obj -> IO ()
@@ -1394,72 +1689,91 @@ stopPropagation obj = (js_stopPropagation (asEventObject obj))
 
 -- * MouseEventObject
 
-newtype MouseEventObject = MouseEventObject { unMouseEventObject :: JSVal }
+newtype MouseEventObject (ev :: MouseEvent) = MouseEventObject { unMouseEventObject :: JSVal }
 
-instance Show MouseEventObject where
+instance Show (MouseEventObject ev) where
   show _ = "MouseEventObject"
 
-instance ToJSVal MouseEventObject where
+instance ToJSVal (MouseEventObject ev) where
   toJSVal = return . unMouseEventObject
   {-# INLINE toJSVal #-}
 
-instance FromJSVal MouseEventObject where
+instance FromJSVal (MouseEventObject ev) where
   fromJSVal = return . fmap MouseEventObject . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
-instance IsEventObject MouseEventObject where
+instance IsEventObject (MouseEventObject ev) where
+  type Ev (MouseEventObject ev) = ev
   asEventObject (MouseEventObject jsval) = EventObject jsval
 
 foreign import javascript unsafe "$1[\"clientX\"]" clientX ::
-        MouseEventObject -> Double
+        MouseEventObject ev -> Double
 
 foreign import javascript unsafe "$1[\"clientY\"]" clientY ::
-        MouseEventObject -> Double
+        MouseEventObject ev -> Double
 
 foreign import javascript unsafe "$1[\"button\"]" button ::
-        MouseEventObject -> Int
+        MouseEventObject ev -> Int
 
 foreign import javascript unsafe "$1[\"shiftKey\"]" mouse_shiftKey ::
-        MouseEventObject -> Bool
+        MouseEventObject ev -> Bool
 
 foreign import javascript unsafe "$1[\"ctrlKey\"]" mouse_ctrlKey ::
-        MouseEventObject -> Bool
+        MouseEventObject ev -> Bool
 
 foreign import javascript unsafe "$1[\"altKey\"]" mouse_altKey ::
-        MouseEventObject -> Bool
+        MouseEventObject ev -> Bool
 
 foreign import javascript unsafe "$1[\"metaKey\"]" mouse_metaKey ::
-        MouseEventObject -> Bool
+        MouseEventObject ev -> Bool
 
-instance HasModifierKeys MouseEventObject where
+instance HasModifierKeys (MouseEventObject ev) where
   shiftKey = mouse_shiftKey
   ctrlKey  = mouse_ctrlKey
   altKey   = mouse_altKey
   metaKey  = mouse_metaKey
 
+-- * KeyboardEvent
+
+data KeyboardEvent
+  = KeyDown
+  | KeyPress
+  | KeyUp
+    deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+instance IsEvent KeyboardEvent where
+  eventToJSString KeyDown  = JS.pack "keydown"
+  eventToJSString KeyPress = JS.pack "keypress"
+  eventToJSString KeyUp    = JS.pack "keyup"
+
+type instance UniqEventName KeyDown  = "keydown"
+type instance UniqEventName KeyPress = "keypress"
+type instance UniqEventName KeyUp    = "keyup"
+
 -- * KeyboardEventObject
 
-newtype KeyboardEventObject = KeyboardEventObject { unKeyboardEventObject :: JSVal }
+newtype KeyboardEventObject (ev :: KeyboardEvent) = KeyboardEventObject { unKeyboardEventObject :: JSVal }
 
-instance ToJSVal KeyboardEventObject where
+instance ToJSVal (KeyboardEventObject ev) where
   toJSVal = return . unKeyboardEventObject
   {-# INLINE toJSVal #-}
 
-instance FromJSVal KeyboardEventObject where
+instance FromJSVal (KeyboardEventObject ev) where
   fromJSVal = return . fmap KeyboardEventObject . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
-instance IsEventObject KeyboardEventObject where
+instance IsEventObject (KeyboardEventObject ev) where
+  type Ev (KeyboardEventObject ev) = ev
   asEventObject (KeyboardEventObject jsval) = EventObject jsval
 
 foreign import javascript unsafe "$1[\"charCode\"]" charCode ::
-        KeyboardEventObject -> Int
+        (KeyboardEventObject ev) -> Int
 
 foreign import javascript unsafe "$1[\"keyCode\"]" keyCode ::
-        KeyboardEventObject -> Int
+        (KeyboardEventObject ev) -> Int
 
 foreign import javascript unsafe "$1[\"which\"]" which ::
-        KeyboardEventObject -> Int
+        (KeyboardEventObject ev) -> Int
 
 
 class HasModifierKeys obj where
@@ -1469,128 +1783,204 @@ class HasModifierKeys obj where
   metaKey  :: obj -> Bool
 
 foreign import javascript unsafe "$1[\"shiftKey\"]" keyboard_shiftKey ::
-        KeyboardEventObject -> Bool
+        (KeyboardEventObject ev) -> Bool
 
 foreign import javascript unsafe "$1[\"ctrlKey\"]" keyboard_ctrlKey ::
-        KeyboardEventObject -> Bool
+        (KeyboardEventObject ev) -> Bool
 
 foreign import javascript unsafe "$1[\"altKey\"]" keyboard_altKey ::
-        KeyboardEventObject -> Bool
+        (KeyboardEventObject ev) -> Bool
 
 foreign import javascript unsafe "$1[\"metaKey\"]" keyboard_metaKey ::
-        KeyboardEventObject -> Bool
+        (KeyboardEventObject ev) -> Bool
 
-instance HasModifierKeys KeyboardEventObject where
+instance HasModifierKeys (KeyboardEventObject ev) where
   shiftKey = keyboard_shiftKey
   ctrlKey  = keyboard_ctrlKey
   altKey   = keyboard_altKey
   metaKey  = keyboard_metaKey
 
+-- * CloseEvent
+
+data CloseEvent
+  = Close
+    deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+type instance UniqEventName Close      = "close"
+
+-- * CloseEventObject
+
+newtype CloseEventObject (ev :: CloseEvent) = CloseEventObject { unCloseEventObject :: JSVal }
+
+instance Show (CloseEventObject ev) where
+  show _ = "CloseEventObject"
+
+instance ToJSVal (CloseEventObject ev) where
+  toJSVal = return . unCloseEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal (CloseEventObject ev) where
+  fromJSVal = return . fmap CloseEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject (CloseEventObject ev) where
+  type Ev (CloseEventObject ev) = ev
+  asEventObject (CloseEventObject jsval) = EventObject jsval
+
+-- * FocusEvent
+
+data FocusEvent
+  = Blur
+  | Focus
+  | FocusIn  -- bubbles
+  | FocusOut -- bubbles
+    deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+instance IsEvent FocusEvent where
+  eventToJSString Blur     = JS.pack "blur"
+  eventToJSString Focus    = JS.pack "focus"
+  eventToJSString FocusIn  = JS.pack "focusin"
+  eventToJSString FocusOut = JS.pack "focusout"
+
+type instance UniqEventName Blur     = "blur"
+type instance UniqEventName Focus    = "focus"
+type instance UniqEventName FocusIn  = "focusin"
+type instance UniqEventName FocusOut = "focusout"
+
 -- * FocusEventObject
 
-newtype FocusEventObject = FocusEventObject { unFocusEventObject :: JSVal }
+newtype FocusEventObject (ev :: FocusEvent) = FocusEventObject { unFocusEventObject :: JSVal }
 
-instance Show FocusEventObject where
+instance Show (FocusEventObject ev) where
   show _ = "FocusEventObject"
 
-instance ToJSVal FocusEventObject where
+instance ToJSVal (FocusEventObject ev) where
   toJSVal = return . unFocusEventObject
   {-# INLINE toJSVal #-}
 
-instance FromJSVal FocusEventObject where
+instance FromJSVal (FocusEventObject ev) where
   fromJSVal = return . fmap FocusEventObject . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
-instance IsEventObject FocusEventObject where
+instance IsEventObject (FocusEventObject ev) where
+  type Ev (FocusEventObject ev) = ev
   asEventObject (FocusEventObject jsval) = EventObject jsval
 
+-- * ProgressEvent
+
+-- | note: "abort", "load", and "error" can sometimes return a 'ProgressEventObject'
+-- instead of an 'EventObject'. But, we can not add constructors for that to
+-- 'ProgressEvent' because we require that all constructors map to a unique
+-- string. Instead you'll need to use the more generic 'Abort', 'Load', 'Error', and
+-- manually cast the 'EventObject' to a 'ProgressEventObject' if you need access to the
+-- extra 'ProgressEvent' parameters.
+data ProgressEvent
+  = LoadEnd
+  | LoadStart
+  | Progress
+  | Timeout
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+type instance UniqEventName LoadStart     = "loadstart"
+type instance UniqEventName Progress      = "progress"
+type instance UniqEventName Timeout       = "timeout"
+type instance UniqEventName LoadEnd       = "loadend"
+
+instance IsEvent ProgressEvent where
+  eventToJSString LoadStart     = JS.pack "loadstart"
+  eventToJSString Progress      = JS.pack "progress"
+  eventToJSString Timeout       = JS.pack "timeout"
+  eventToJSString LoadEnd       = JS.pack "loadend"
 
 -- * ProgressEventObject
 
-newtype ProgressEventObject = ProgressEventObject { unProgressEventObject :: JSVal }
+newtype ProgressEventObject (ev :: ProgressEvent) = ProgressEventObject { unProgressEventObject :: JSVal }
 
-instance ToJSVal ProgressEventObject where
+instance ToJSVal (ProgressEventObject ev) where
   toJSVal = return . unProgressEventObject
   {-# INLINE toJSVal #-}
 
-instance FromJSVal ProgressEventObject where
+instance FromJSVal (ProgressEventObject ev) where
   fromJSVal = return . fmap ProgressEventObject . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
--- charCode :: (MonadIO m) => KeyboardEventObject -> IO
-
--- * ElementScrollObject
-
-newtype ElementScrollEventObject = ElementScrollEventObject { unElementScrollEventObject :: JSVal }
-
-instance Show ElementScrollEventObject where
-  show _ = "ElementScrollEventObject"
-
-instance ToJSVal ElementScrollEventObject where
-  toJSVal = return . unElementScrollEventObject
-  {-# INLINE toJSVal #-}
-
-instance FromJSVal ElementScrollEventObject where
-  fromJSVal = return . fmap ElementScrollEventObject . maybeJSNullOrUndefined
-  {-# INLINE fromJSVal #-}
-
-instance IsEventObject ElementScrollEventObject where
-  asEventObject (ElementScrollEventObject jsval) = EventObject jsval
-
 foreign import javascript unsafe "$1[\"scrollTop\"]" scrollTop ::
-        ElementScrollEventObject -> Int
+        JSElement -> Int
 foreign import javascript unsafe "$1[\"scrollLeft\"]" scrollLeft ::
-        ElementScrollEventObject -> Int
+        JSElement -> Int
 
 -- * EventObjectOf
 
-type family EventObjectOf event :: *
-type instance EventObjectOf Event          = EventObject
-type instance EventObjectOf MouseEvent     = MouseEventObject
-type instance EventObjectOf KeyboardEvent  = KeyboardEventObject
-type instance EventObjectOf FocusEvent     = FocusEventObject
-type instance EventObjectOf FormEvent      = EventObject
-type instance EventObjectOf ProgressEvent  = ProgressEventObject
-type instance EventObjectOf ClipboardEvent = ClipboardEventObject
-type instance EventObjectOf SelectionEvent = SelectionEventObject
-type instance EventObjectOf DragEvent      = DragEventObject
-type instance EventObjectOf ElementScrollEvent = ElementScrollEventObject
+type family EventObjectOf (event :: k) :: o where
+  EventObject (ev :: Event)                 = EventObject ev
+  EventObject (ev :: AnimationEvent)        = AnimationEventObject ev
+  EventObject (ev :: ClipboardEvent)        = ClipboardEventObject ev
+  EventObject (ev :: CloseEvent)            = CloseEventObject ev
+  EventObject (ev :: DragEvent)             = DragEventObject ev
+  EventObject (ev :: FocusEvent)            = FocusEventObject ev
+  EventObject (ev :: FormEvent)             = EventObject ev
+  EventObject (ev :: HashChangeEvent)       = HashChangeEventObject ev
+  EventObject (ev :: KeyboardEvent)         = KeyboardEventObject ev
+  EventObject (ev :: MediaEvent)            = EventObject ev
+  EventObject (ev :: MessageEvent)          = MessageEventObject ev
+  EventObject (ev :: MouseEvent)            = MouseEventObject ev
+  EventObject (ev :: NetworkEvent)          = EventObject ev
+  EventObject (ev :: PageTransitionEvent)   = PageTransitionEventObject ev
+  EventObject (ev :: PopStateEvent)         = PopStateEventObject ev
+  EventObject (ev :: PrintingEvent)         = EventObject ev
+  EventObject (ev :: ProgressEvent)         = ProgressEventObject ev
+  EventObject (ev :: PromiseRejectionEvent) = PromiseRejectionEventObject ev
+  EventObject (ev :: ResourceEvent)         = EventObject ev
+  EventObject (ev :: SelectionEvent)        = EventObject ev
+  EventObject (ev :: StorageEvent)          = StorageEventObject ev
+  EventObject (ev :: TouchEvent)            = TouchEventObject ev
+  EventObject (ev :: TransitionEvent)       = TransitionEventObject ev
+  EventObject (ev :: ViewEvent)             = EventObject ev
+  EventObject (ev :: VDOMEvent)             = VDOMEventObject ev
+  EventObject (ev :: WheelEvent)            = WheelEventObject ev
+  EventObject e                             = CustomEventObject e (CustomEventDetail e)
 
 -- * CustomEvent
 
-data CustomEvent (e :: k) = CustomEvent
+-- | A type for CustomEvent objects. The phantom parameter `detail`
+-- specifies the type of the detail field.
+newtype CustomEventObject ev detail = CustomEventObject { unCustomEventObject :: JSVal }
 
-instance KnownSymbol e => IsEvent (CustomEvent e) where
-  eventToJSString (CustomEvent {}) = JS.pack $ symbolVal (Proxy :: Proxy e)
-
-newtype CustomEventObject (e :: k) a = CustomEventObject { unCustomEventObject :: JSVal }
-
-instance ToJSVal (CustomEventObject e a) where
+instance ToJSVal (CustomEventObject ev detail) where
   toJSVal = return . unCustomEventObject
   {-# INLINE toJSVal #-}
 
-instance FromJSVal (CustomEventObject e a) where
+instance FromJSVal (CustomEventObject ev detail) where
   fromJSVal = return . fmap CustomEventObject . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
-instance IsEventObject (CustomEventObject e a) where
+-- type CustomEventObject' detail ev = CustomEventObject ev detail
+
+instance IsEventObject (CustomEventObject ev detail) where
+  type Ev (CustomEventObject ev detail) = ev
   asEventObject (CustomEventObject jsval) = EventObject jsval
 
 foreign import javascript unsafe "new CustomEvent($1, { 'detail': $2, 'bubbles' : $3, 'cancelable' : $4})"
         js_newCustomEvent :: JSString -> JSVal -> Bool -> Bool -> IO JSVal
 
-newCustomEvent :: (IsEvent (CustomEvent ev), FromJSVal a, ToJSVal a) => CustomEvent ev -> Maybe a -> Bool -> Bool -> IO (CustomEventObject ev a)
+newCustomEvent :: (KnownSymbol (UniqEventName ev), FromJSVal detail, ToJSVal detail) => EventName ev -> Maybe detail -> Bool -> Bool -> IO (CustomEventObject ev detail)
 newCustomEvent ev detail bubbles cancelable =
-  do let evStr = eventToJSString ev
+  do let evStr = JS.pack $ eventName ev
      d <- toJSVal detail
      jsval <- js_newCustomEvent evStr d bubbles cancelable
      pure $ CustomEventObject jsval
 
 foreign import javascript unsafe "$r = $1[\"detail\"]"
-        js_detail :: CustomEventObject e a -> JSVal
+        js_detail :: CustomEventObject e detail -> JSVal
 
-detail :: (FromJSVal a) => CustomEventObject e a -> IO (Maybe a)
+detail :: (FromJSVal detail) => CustomEventObject e detail -> IO (Maybe detail)
 detail ceo = fromJSVal $ js_detail ceo
+
+-- | specify the type of the detail for a custom event
+--
+-- 'ev' is a event name
+-- 'detail' is the type of the CustomEvent 'detail'
+type family CustomEventDetail (ev :: k) = detail
 
 -- * addEventListener
 
@@ -1598,56 +1988,26 @@ detail ceo = fromJSVal $ js_detail ceo
 foreign import javascript unsafe "$1[\"addEventListener\"]($2, $3,\n$4)"
    js_addEventListener :: EventTarget -> JSString -> Callback (JSVal -> IO ()) -> Bool -> IO ()
 
-addEventListener :: (MonadIO m, IsEventTarget self, IsEvent event, FromJSVal (EventObjectOf event)) =>
+addEventListener :: forall m self k eventName. (MonadIO m, IsEventTarget self, KnownSymbol (UniqEventName (eventName :: k)), FromJSVal (EventObjectOf eventName)) =>
                   self
-               -> event
-               -> (EventObjectOf event -> IO ())
+               -> EventName eventName
+               -> (EventObjectOf eventName -> IO ())
                -> Bool
                -> m ()
 addEventListener self event callback useCapture = liftIO $
   do cb <- syncCallback1 ThrowWouldBlock callback'
-     js_addEventListener (toEventTarget self) (eventToJSString event) cb useCapture
+     let evStr = JS.pack $ eventName event
+     js_addEventListener (toEventTarget self) evStr cb useCapture
   where
     callback' = \ev ->
          do (Just eventObject) <- fromJSVal ev
             callback eventObject
 
 foreign import javascript unsafe "$1[\"dispatchEvent\"]($2)"
-  js_dispatchEvent :: EventTarget -> EventObject -> IO ()
+  js_dispatchEvent :: EventTarget -> EventObject ev -> IO ()
 
 dispatchEvent :: (MonadIO m, IsEventTarget eventTarget, IsEventObject eventObj) => eventTarget -> eventObj -> m ()
 dispatchEvent et ev = liftIO $ js_dispatchEvent (toEventTarget et) (asEventObject ev)
-
-{-
--- | <https://developer.mozilla.org/en-US/docs/Web/API/EventTarget.addEventListener Mozilla EventTarget.addEventListener documentation>
-addEventListener
-  :: (MonadIO m, IsEventTarget self) =>
-     self
-  -> EventType
-  -> Callback (IO ())
-  -> Bool
-  -> m ()
-addEventListener self type' listener useCapture
-  = liftIO
-      (js_addEventListener (toEventTarget self)
-         type''
-         listener
---         (maybe jsNull pToJSVal listener)
-         useCapture)
-             where
-               type'' = case type' of
-                          Change -> JS.pack "change"
-                          Click  -> JS.pack "click"
-                          Input  -> JS.pack "input"
-                          Blur   -> JS.pack "blur"
-                          Keydown -> JS.pack "keydown"
-                          Keyup   -> JS.pack "keyup"
-                          Keypress -> JS.pack "keypress"
-                          ReadyStateChange -> JS.pack "readystatechange"
-                          EventTxt s -> s
-
--}
-
 
 -- * DOMRect
 
@@ -1692,15 +2052,6 @@ foreign import javascript unsafe "$1 instanceof XMLHttpRequest"
 instance InstanceOf XMLHttpRequest where
   instanceOf a = js_instanceOfXMLHttpRequest (pToJSVal a)
 
-{-
-instance PToJSVal XMLHttpRequest where
-  pToJSVal = unXMLHttpRequest
-  {-# INLINE pToJSVal #-}
-
-instance PFromJSVal XMLHttpRequest where
-  pFromJSVal = XMLHttpRequest
-  {-# INLINE pFromJSVal #-}
--}
 instance ToJSVal XMLHttpRequest where
   toJSVal = return . unXMLHttpRequest
   {-# INLINE toJSVal #-}
@@ -1839,20 +2190,7 @@ foreign import javascript unsafe "\"text\""
         js_XMLHttpRequestResponseTypeText ::
         JSVal -- XMLHttpRequestResponseType
 
-{-
-instance PToJSVal XMLHttpRequestResponseType where
-        pToJSVal XMLHttpRequestResponseType = js_XMLHttpRequestResponseType
-        pToJSVal XMLHttpRequestResponseTypeArraybuffer
-          = js_XMLHttpRequestResponseTypeArraybuffer
-        pToJSVal XMLHttpRequestResponseTypeBlob
-          = js_XMLHttpRequestResponseTypeBlob
-        pToJSVal XMLHttpRequestResponseTypeDocument
-          = js_XMLHttpRequestResponseTypeDocument
-        pToJSVal XMLHttpRequestResponseTypeJson
-          = js_XMLHttpRequestResponseTypeJson
-        pToJSVal XMLHttpRequestResponseTypeText
-          = js_XMLHttpRequestResponseTypeText
--}
+
 instance ToJSVal XMLHttpRequestResponseType where
         toJSVal XMLHttpRequestResponseType
           = return js_XMLHttpRequestResponseType
@@ -1867,26 +2205,6 @@ instance ToJSVal XMLHttpRequestResponseType where
         toJSVal XMLHttpRequestResponseTypeText
           = return js_XMLHttpRequestResponseTypeText
 
-{-
-instance PFromJSVal XMLHttpRequestResponseType where
-        pFromJSVal x
-          | x == js_XMLHttpRequestResponseType = XMLHttpRequestResponseType
-        pFromJSVal x
-          | x == js_XMLHttpRequestResponseTypeArraybuffer =
-            XMLHttpRequestResponseTypeArraybuffer
-        pFromJSVal x
-          | x == js_XMLHttpRequestResponseTypeBlob =
-            XMLHttpRequestResponseTypeBlob
-        pFromJSVal x
-          | x == js_XMLHttpRequestResponseTypeDocument =
-            XMLHttpRequestResponseTypeDocument
-        pFromJSVal x
-          | x == js_XMLHttpRequestResponseTypeJson =
-            XMLHttpRequestResponseTypeJson
-        pFromJSVal x
-          | x == js_XMLHttpRequestResponseTypeText =
-            XMLHttpRequestResponseTypeText
--}
 instance FromJSVal XMLHttpRequestResponseType where
 --        fromJSValUnchecked = return . pFromJSVal
         fromJSVal x
@@ -1955,7 +2273,7 @@ sendRemoteWS ws remote =
      WebSockets.send jstr ws
      debugStrLn $ "sent."
 
-initRemoteWS :: (ToJSON remote) => JS.JSString -> (MessageEvent -> IO ()) -> IO (remote -> IO ())
+initRemoteWS :: (ToJSON remote) => JS.JSString -> (MessageEvent.MessageEvent -> IO ()) -> IO (remote -> IO ())
 initRemoteWS url' onMessageHandler =
     do let request = WebSocketRequest { url       = url'
                                       , protocols = []
@@ -1965,41 +2283,53 @@ initRemoteWS url' onMessageHandler =
        ws <- WebSockets.connect request
        pure (sendRemoteWS ws)
 
+-- * DragEvent
+
+data DragEvent
+  = Drag
+  | DragEnd
+  | DragEnter
+  | DragLeave
+  | DragOver
+  | DragStart
+  | Drop
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+instance IsEvent DragEvent where
+  eventToJSString Drag      = JS.pack "drag"
+  eventToJSString DragEnd   = JS.pack "dragend"
+  eventToJSString DragEnter = JS.pack "dragenter"
+  eventToJSString DragLeave = JS.pack "dragleave"
+  eventToJSString DragOver  = JS.pack "dragover"
+  eventToJSString DragStart = JS.pack "dragstart"
+  eventToJSString Drop      = JS.pack "drop"
+
+type instance UniqEventName Drag      = "drag"
+type instance UniqEventName DragEnd   = "dragend"
+type instance UniqEventName DragEnter = "dragenter"
+type instance UniqEventName DragLeave = "dragleave"
+type instance UniqEventName DragOver  = "dragover"
+type instance UniqEventName DragStart = "dragstart"
+type instance UniqEventName Drop      = "drop"
+
 -- * DragEventObject
 
-newtype DragEventObject = DragEventObject { unDragEventObject :: JSVal }
+newtype DragEventObject (ev :: DragEvent) = DragEventObject { unDragEventObject :: JSVal }
 
-instance Show DragEventObject where
+instance Show (DragEventObject ev) where
   show _ = "DragEventObject"
 
-instance ToJSVal DragEventObject where
+instance ToJSVal (DragEventObject ev) where
   toJSVal = return . unDragEventObject
   {-# INLINE toJSVal #-}
 
-instance FromJSVal DragEventObject where
+instance FromJSVal (DragEventObject ev) where
   fromJSVal = return . fmap DragEventObject . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
-instance IsEventObject DragEventObject where
+instance IsEventObject (DragEventObject ev) where
+  type Ev (DragEventObject ev) = ev
   asEventObject (DragEventObject jsval) = EventObject jsval
-
--- * SelectionEventObject
-
-newtype SelectionEventObject = SelectionEventObject { unSelectionEventObject :: JSVal }
-
-instance Show SelectionEventObject where
-  show _ = "SelectionEventObject"
-
-instance ToJSVal SelectionEventObject where
-  toJSVal = return . unSelectionEventObject
-  {-# INLINE toJSVal #-}
-
-instance FromJSVal SelectionEventObject where
-  fromJSVal = return . fmap SelectionEventObject . maybeJSNullOrUndefined
-  {-# INLINE fromJSVal #-}
-
-instance IsEventObject SelectionEventObject where
-  asEventObject (SelectionEventObject jsval) = EventObject jsval
 
 -- * Selection
 
@@ -2267,24 +2597,24 @@ data Attr model where
   Attr :: Text -> Text -> Attr model
   Prop :: Text -> Text -> Attr model
   OnCreate :: (JSElement -> TDVar model -> IO ()) -> Attr model
-  EL :: (Show event, IsEvent event, FromJSVal (EventObjectOf event)) => event -> (EventObjectOf event -> TDVar model -> IO ()) -> Attr model
+  EL :: (Show event, KnownSymbol (UniqEventName event), FromJSVal (EventObjectOf event)) => EventName event -> (EventObjectOf event -> TDVar model -> IO ()) -> Attr model
 
 instance Show (Attr model) where
   show (Attr a v) = Text.unpack a <> " := " <> Text.unpack v
   show (Prop a v) = "." <> Text.unpack a <> " = " <> Text.unpack v
   show (OnCreate _ ) = "onCreate"
-  show (EL e _) = "on" ++ show e
+  show (EL e _) = "on" ++ eventName e
 
 data Html model where
   Element :: Text -> [Attr model] -> [Html model] -> Html model
   CData   :: Text -> Html model
-  Cntl    :: (Show event, IsEvent event, FromJSVal (EventObjectOf event)) =>
-              Control event -> event -> (EventObjectOf event -> TDVar model -> IO ()) -> Html model
+  Cntl    :: (Show event, KnownSymbol (UniqEventName event), FromJSVal (EventObjectOf event)) =>
+              Control event -> EventName event -> (EventObjectOf event -> TDVar model -> IO ()) -> Html model
 
 instance Show (Html model) where
   show (Element n attrs elems) = "Element " <> Text.unpack n <> " " <> show attrs <> " " <> show elems
   show (CData t) = "CData " <> Text.unpack t
-  show (Cntl _ e _) = "Cntl " ++ show e
+  show (Cntl _ e _) = "Cntl " ++ eventName e
 
 data Control event = forall model remote. (Show model) => Control
   { cmodel  :: model
@@ -2308,107 +2638,11 @@ type WithModel model = (model -> IO (Maybe model)) -> IO ()
 
 type Loop = forall model remote. (Show model, ToJSON remote) =>
             JSDocument -> JSNode -> model -> ((remote -> IO ()) -> TDVar model -> IO ()) ->
-            Maybe JS.JSString -> ((remote -> IO ()) -> MessageEvent -> TDVar model -> IO ()) -> ((remote -> IO ()) -> model -> Html model) -> IO (TDVar model)
+            Maybe JS.JSString -> ((remote -> IO ()) -> MessageEvent.MessageEvent -> TDVar model -> IO ()) -> ((remote -> IO ()) -> model -> Html model) -> IO (TDVar model)
 
 foreign import javascript unsafe "window[\"setTimeout\"]($1, $2)" js_setTimeout ::
   Callback (IO ()) -> Int -> IO ()
 
-{-
-renderHtml loop withModel doc (Cntl (Control cmodel cinit cview) eventType eventHandler) =
-  do (Just cBody) <- fmap toJSNode <$> createJSElement doc (Text.pack "span")
-     tid <- liftIO $ forkIO $ loop doc cBody cmodel cinit cview
-     addEventListener cBody eventType (\e -> withModel (eventHandler e)) False
-     pure (Just cBody)
--}
-{-
-renderHtml loop withModel doc (Cntl (Control cmodel cview) eventType eventHandler) =
-  do (Just cBody) <- fmap toJSNode <$> createJSElement doc (Text.pack "div")
-     (Just html) <- renderHtml loop (\f -> f cmodel >> pure ()) doc (cview cmodel)
-     appendChild cBody (Just html)
-     addEventListener cBody eventType (\e -> withModel (eventHandler e)) False
-     pure (Just cBody)
--}
-
-{-
-data Attr action where
-  Attr  :: Text -> Text -> Attr action
-  Event :: (FromJSVal (EventObjectOf event), IsEvent event) => event -> (EventObjectOf event -> IO action) -> Attr action
-
--- | FIXME: this instances is not really right, but was added for the sake of the test suite
-instance Eq (Attr action) where
-  (Attr k1 v1) == (Attr k2 v2) = (k1 == k2) && (v1 == v2)
-  _ == _ = False
-
--- This issue with this is that we need to store state across calls to 'view'
-data Widget action = forall model widgetAction. Widget
-  { initWidget   :: model
-  , widget :: model -> widgetAction -> (HTML action, model)
-  }
-
-
-data HTML action
-  = Element { elementName        :: Text
-            , elementAttrs       :: [Attr action]
-            , elementKey         :: Maybe Text
-            , elementDescendants :: Int
-            , elementChildren    :: [HTML action]
-            }
-  | CDATA Bool Text
---   | W (Widget action)
---    deriving Eq
-
---   | Children [HTML action]
-
-instance Show (Attr action) where
-    show (Attr k v) = (Text.unpack k) <> " := " <> (Text.unpack v) <> " "
-    show (Event _eventType _) = "Event " -- ++ show eventType ++ " <function>"
-
-instance Show (HTML action) where
-    show (Element tagName attrs _key _count children) =
-        (Text.unpack tagName) <> " [" <> concat (map show attrs) <> "]\n" <> concat (map showChild children)
-        where
-          showChild c = "    " <> show c <> "\n"
-    show (CDATA b txt) = Text.unpack txt
-
-descendants :: [HTML action] -> Int
-descendants elems = sum [ d | Element _ _ _ d _ <- elems] + (length elems)
-
-renderHTML :: forall action m. (MonadIO m) => (action -> IO ()) -> JSDocument -> HTML action -> m (Maybe JSNode)
-renderHTML _ doc (CDATA _ t) = fmap (fmap toJSNode) $ createJSTextNode doc t
-renderHTML handle doc (Element tag {- events -} attrs _ _ children) =
-    do me <- createJSElement doc tag
-       case me of
-         Nothing -> return Nothing
-         (Just e) ->
-             do mapM_ (\c -> appendChild e =<< renderHTML handle doc c) children
-                mapM_ (doAttr e) attrs
-                {-
-                let events' = [ ev | ev@(Event ev f) <- attrs]
-                    attrs'  = [ (k,v) | Attr k v <- attrs]
-                liftIO $ mapM_ (\(k, v) -> setAttribute e k v) attrs'
-                liftIO $ mapM_ (handleEvent e) events'
-                -}
-                return (Just $ toJSNode e)
-    where
-      doAttr elem (Attr k v)   = setAttribute elem k v
-      doAttr elem (Event eventType toAction) =
-           addEventListener elem eventType (\e -> handle =<< (toAction e)) False
-{-
-      handle' :: JSElement -> (Maybe JSString -> action) -> IO ()
-      handle' elem toAction =
-          do ms <- getValue elem
-             handle (toAction ms)
--}
---       handleEvent :: JSElement -> Attr (event, EventObjectOf event -> action) -> IO ()
-{-
-      handleEvent elem (Event eventType toAction) =
-        addEventListener elem eventType (\e -> handle =<< toAction e) False
--}
-{-
-          do cb <- asyncCallback (handle' elem toAction) -- FIXME: free ?
-             addEventListener elem eventType cb False
--}
--}
 -- * DataTransfer
 
 newtype DataTransfer = DataTransfer { unDataTransfer :: JSVal }
@@ -2477,6 +2711,10 @@ data ClipboardEvent
   | Paste
     deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
+type instance UniqEventName Copy  = "copy"
+type instance UniqEventName Cut   = "cut"
+type instance UniqEventName Paste = "paste"
+
 instance IsEvent ClipboardEvent where
   eventToJSString Copy  = JS.pack "copy"
   eventToJSString Cut   = JS.pack "cut"
@@ -2484,36 +2722,37 @@ instance IsEvent ClipboardEvent where
 
 -- * ClipboardEventObject
 
-newtype ClipboardEventObject = ClipboardEventObject { unClipboardEventObject :: JSVal }
+newtype ClipboardEventObject (ev :: ClipboardEvent) = ClipboardEventObject { unClipboardEventObject :: JSVal }
 
-instance Show ClipboardEventObject where
+instance Show (ClipboardEventObject ev) where
   show _ = "ClipboardEventObject"
 
-instance ToJSVal ClipboardEventObject where
+instance ToJSVal (ClipboardEventObject ev) where
   toJSVal = pure . unClipboardEventObject
   {-# INLINE toJSVal #-}
 
-instance FromJSVal ClipboardEventObject where
+instance FromJSVal (ClipboardEventObject ev) where
   fromJSVal = pure . fmap ClipboardEventObject . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
-instance IsEventObject ClipboardEventObject where
+instance IsEventObject (ClipboardEventObject ev) where
+  type Ev (ClipboardEventObject ev) = ev
   asEventObject (ClipboardEventObject jsval) = EventObject jsval
 
 foreign import javascript unsafe "$1[\"clipboardData\"]" clipboardData ::
-        ClipboardEventObject -> IO DataTransfer
+        ClipboardEventObject ev -> IO DataTransfer
 
 -- * Event
 
 foreign import javascript unsafe "new Event($1, { 'bubbles' : $2, 'cancelable' : $3})"
         js_newEvent :: JSString -> Bool -> Bool -> IO JSVal
 
-class (IsEvent ev) => MkEvent ev where
-  mkEvent :: ev -> JSVal -> EventObjectOf ev
+class MkEvent ev where
+  mkEvent :: EventName ev -> JSVal -> EventObjectOf ev
 
-newEvent :: forall ev. (IsEvent ev, MkEvent ev) => ev -> Bool -> Bool -> IO (EventObjectOf ev)
+newEvent :: (MkEvent (ev :: k), KnownSymbol (UniqEventName (ev :: k))) => EventName ev -> Bool -> Bool -> IO (EventObjectOf ev)
 newEvent ev bubbles cancelable =
-  do let evStr = eventToJSString ev
+  do let evStr = JS.pack $ eventName ev
      jsval <- js_newEvent evStr bubbles cancelable
      pure $ mkEvent ev jsval
 
@@ -2524,29 +2763,30 @@ data VDOMEvent
      = Redrawn
        deriving (Eq, Show)
 
+type instance UniqEventName Redrawn = "redrawn"
+
 instance IsEvent VDOMEvent where
   eventToJSString Redrawn = fromString "redrawn"
 
-newtype VDOMEventObject = VDOMEventObject { unVDOMEventObject :: JSVal }
+newtype VDOMEventObject ev = VDOMEventObject { unVDOMEventObject :: JSVal }
 
-instance MkEvent VDOMEvent where
+instance MkEvent Redrawn where
   mkEvent _ jsval = VDOMEventObject jsval
 
-instance Show VDOMEventObject where
+instance Show (VDOMEventObject ev) where
   show _ = "VDOMEventObject"
 
-instance ToJSVal VDOMEventObject where
+instance ToJSVal (VDOMEventObject ev) where
   toJSVal = return . unVDOMEventObject
   {-# INLINE toJSVal #-}
 
-instance FromJSVal VDOMEventObject where
+instance FromJSVal (VDOMEventObject ev) where
   fromJSVal = return . fmap VDOMEventObject . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
-instance IsEventObject VDOMEventObject where
+instance IsEventObject (VDOMEventObject ev) where
+  type Ev (VDOMEventObject ev) = ev
   asEventObject (VDOMEventObject jsval) = EventObject jsval
-
-type instance EventObjectOf VDOMEvent   = VDOMEventObject
 
 -- * JSDom
 
