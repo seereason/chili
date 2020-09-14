@@ -159,6 +159,12 @@ instance FromJSVal EventTarget where
 class IsEventTarget o where
     toEventTarget :: o -> EventTarget
 
+foreign import javascript unsafe "new EventTarget()"
+        js_newEventTarget :: IO JSVal
+
+newEventTarget :: (MonadIO m) => m EventTarget
+newEventTarget = liftIO $ EventTarget <$> js_newEventTarget
+
 fromEventTarget :: forall o. (PFromJSVal o, InstanceOf o, IsEventTarget o) => EventTarget -> Maybe o
 fromEventTarget eventTarget@(EventTarget jsval) =
       if instanceOf @o eventTarget
