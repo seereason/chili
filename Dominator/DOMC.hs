@@ -290,6 +290,7 @@ pExp (path, spliceType) =
           dMapList = case dMap of
             Nothing -> "[]"
             (Just (Attr _ asStr)) -> asStr
+            (Just _) -> error "missing pattern match in pExp CustomElement dMapList"
 {-
           list = case dMap of
             Nothing -> []
@@ -302,6 +303,7 @@ pExp (path, spliceType) =
       case (parseExp (camelCase fnStr), parseExp dMapList) of
         (Right fn, Right as) ->
           do (path, [| CustomElementV (fromJust . fromDynamic) $(pure fn) $(pure as) |])
+        (_,_)  -> error "missing pattern match in pExp CustomElement in case"
 
 camelCase :: String -> String
 camelCase tag = camelCase' $ drop 2 tag
@@ -329,7 +331,8 @@ selectorName' (F Start) = "f"
 selectorName' (N Start) = "f"
 selectorName' (F p) = "f_" ++ selectorName' p
 selectorName' (N p) = "n_" ++ selectorName' p
-selectorName' (E _) = error "Dominator.DOMC.selectorName'"
+selectorName' (E _) = error "Dominator.DOMC.selectorName' E"
+selectorName' (D _) = error "Dominator.DOMC.selectorName' D"
 
 data UpdateNode
   = UpdateAttribute String

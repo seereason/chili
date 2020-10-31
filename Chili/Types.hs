@@ -1184,6 +1184,7 @@ type instance UniqEventName MouseOut    = "mouseout"
 type instance UniqEventName MouseUp     = "mouseup"
 
 instance IsEvent MouseEvent where
+  eventToJSString AuxClick    = JS.pack "auxclick"
   eventToJSString Click       = JS.pack "click"
   eventToJSString ContextMenu = JS.pack "contextmenu"
   eventToJSString DblClick    = JS.pack "dblclick"
@@ -1576,6 +1577,7 @@ type instance UniqEventName SelectStart     = "selectstart"
 type instance UniqEventName SelectionChange = "selectionchange"
 
 instance IsEvent SelectionEvent where
+  eventToJSString Select          = JS.pack "select"
   eventToJSString SelectStart     = JS.pack "selectstart"
   eventToJSString SelectionChange = JS.pack "selectionchange"
 

@@ -26,6 +26,7 @@ library
                        template-haskell,
                        text
   default-language:    Haskell2010
+  ghc-options:         -Werror=incomplete-patterns
   exposed-modules:
                   Chili.Canvas
                   Chili.Canvas.Color
