@@ -43,7 +43,7 @@ module Dominator.Types
 
 import Control.Concurrent.MVar (MVar)
 import Control.Monad.Trans (MonadIO(liftIO))
-import Chili.Types (Command(..), EventObjectOf, IsEvent, IsJSNode(toJSNode), JSDocument(..), JSElement(..), JSTextNode(..), JSNode(..), FormEvent(..), EventName(..), EventObject(..), MouseEvent(..), MouseEventObject(..), UniqEventName, addEventListener, currentDocument, eventName, execCommand, fromEventTarget, getAttribute, getChecked, getFirstChild, getElementById, getElementsByTagName, isEqualNode, item, queryCommandState, nextSibling, removeChildren, setAttribute, setChecked, setProperty, setNodeValue, target)
+import Chili.Types (Command(..), EventObjectOf, IsEvent, IsJSNode(toJSNode), JSDocument(..), JSElement(..), JSTextNode(..), JSNode(..), FormEvent(..), EventName(..), EventObject(..), MouseEvent(..), MouseEventObject(..), UniqEventName, addEventListener, addEventListenerOpt, currentDocument, eventName, execCommand, fromEventTarget, getAttribute, getChecked, getFirstChild, getElementById, getElementsByTagName, isEqualNode, item, queryCommandState, nextSibling, removeChildren, setAttribute, setChecked, setProperty, setNodeValue, target)
 import Data.JSString (JSString)
 import qualified Data.JSString as JS
 import Data.JSString.Text (textToJSString, textFromJSString)
@@ -61,12 +61,14 @@ data Attr where
   Prop     :: Text -> Text -> Attr
   OnCreate :: (JSElement -> IO ()) -> Attr
   EL       :: (KnownSymbol (UniqEventName event), FromJSVal (EventObjectOf event)) => EventName event -> (EventObjectOf event -> IO ()) -> Attr
+  ELO      :: (KnownSymbol (UniqEventName event), FromJSVal (EventObjectOf event)) => EventName event -> (Bool, Bool, Bool) -> (EventObjectOf event -> IO ()) -> Attr
 
 instance Show Attr where
   show (Attr a v) = Text.unpack a <> " := " <> Text.unpack v
   show (Prop a v) = "." <> Text.unpack a <> " = " <> Text.unpack v
   show (OnCreate _ ) = "onCreate"
   show (EL e _) = "on" ++ eventName e
+  show (ELO e os _) = "on" ++ eventName e ++ show os
 
 data Html where
   Element :: Text -> Maybe Text -> [Attr] -> [Html] -> Html

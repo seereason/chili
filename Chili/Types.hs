@@ -2011,6 +2011,27 @@ addEventListener self event callback useCapture = liftIO $
          do (Just eventObject) <- fromJSVal ev
             callback eventObject
 
+-- * addEventListener
+
+-- FIXME: Element is overly restrictive
+foreign import javascript unsafe "$1['addEventListener']($2, $3,{'capture':$4,'once':$5,'passive':$6})"
+   js_addEventListenerOpt :: EventTarget -> JSString -> Callback (JSVal -> IO ()) -> Bool -> Bool -> Bool -> IO ()
+
+addEventListenerOpt :: forall m self k eventName. (MonadIO m, IsEventTarget self, KnownSymbol (UniqEventName (eventName :: k)), FromJSVal (EventObjectOf eventName)) =>
+                  self
+               -> EventName eventName
+               -> (EventObjectOf eventName -> IO ())
+               -> (Bool, Bool, Bool)
+               -> m ()
+addEventListenerOpt self event callback (capture,once,passive) = liftIO $
+  do cb <- syncCallback1 ThrowWouldBlock callback'
+     let evStr = JS.pack $ eventName event
+     js_addEventListenerOpt (toEventTarget self) evStr cb capture once passive
+  where
+    callback' = \ev ->
+         do (Just eventObject) <- fromJSVal ev
+            callback eventObject
+
 foreign import javascript unsafe "$1[\"dispatchEvent\"]($2)"
   js_dispatchEvent :: EventTarget -> EventObject ev -> IO ()
 
