@@ -130,12 +130,28 @@ instance IsParentNode JSDocumentFragment
 
 foreign import javascript unsafe "$1[\"append\"]($2)"
   js_append :: JSNode -> JSVal -> IO ()
+{-
+To use this, we'd need to figure out how to call append with the spread operator,
+
+https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_syntax
 
 appendNodeList :: (IsParentNode parent, MonadIO m) => parent -> JSNodeList -> m ()
 appendNodeList parent nl = liftIO $
   do nlv <- toJSVal nl
      js_append (toJSNode parent) nlv
+-}
 
+{-
+
+This would work if we created an HTMLCollection datatype. But perhaps you want childNodes anyway?
+
+foreign import javascript unsafe "$1[\"children\"]"
+  js_children :: JSNode -> IO HTMLCollection
+
+children :: (IsParentNode parent, MonadIO m) => parent -> m HTMLCollection
+children parent = liftIO $
+  do js_children (toJSNode parent)
+-}
 -- * EventTarget
 
 newtype EventTarget = EventTarget { unEventTarget :: JSVal }
@@ -226,6 +242,15 @@ foreign import javascript unsafe "$1[\"parentNode\"]"
 parentNode :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
 parentNode self =
     liftIO (fromJSVal =<< js_parentNode (toJSNode self))
+
+-- * parentElement
+
+foreign import javascript unsafe "$1[\"parentElement\"]"
+        js_parentElement :: JSNode -> IO JSVal
+
+parentElement :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSElement)
+parentElement self =
+    liftIO (fromJSVal =<< js_parentElement (toJSNode self))
 
 -- * nodeType
 
@@ -554,7 +579,9 @@ foreign import javascript unsafe "$1[\"getSelection\"]()"
 getSelection :: (MonadIO m) => JSWindow -> m Selection
 getSelection w = liftIO (js_getSelection w)
 
+-------------------------
 -- * JSElement
+-------------------------
 
 newtype JSElement = JSElement JSVal
 
@@ -910,6 +937,16 @@ foreign import javascript unsafe "$1[\"nextSibling\"]"
 nextSibling :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
 nextSibling self
   = liftIO ((js_nextSibling ((toJSNode self))) >>= fromJSVal)
+
+-- * nextElementSibling
+
+foreign import javascript unsafe "$1[\"nextElementSibling\"]"
+        js_nextElementSibling :: JSNode -> IO JSVal
+
+-- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.nextSibling Mozilla Node.nextSibling documentation>
+nextElementSibling :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSElement)
+nextElementSibling self
+  = liftIO ((js_nextElementSibling ((toJSNode self))) >>= fromJSVal)
 
 
 foreign import javascript unsafe "$1[\"previousSibling\"]"
@@ -2066,6 +2103,15 @@ foreign import javascript unsafe "$1[\"getBoundingClientRect\"]()" js_getBoundin
 getBoundingClientRect :: (MonadIO m) => JSElement -> m DOMClientRect
 getBoundingClientRect = liftIO . js_getBoundingClientRect
 
+-- * offsetWidth
+
+-- https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetWidth
+foreign import javascript unsafe "$r = $1[\"offsetWidth\"]" js_offsetWidth ::
+  JSElement -> IO Int
+
+offsetWidth :: (MonadIO m) => JSElement -> m Int
+offsetWidth = liftIO . js_offsetWidth
+
 -- * XMLHttpRequest
 newtype XMLHttpRequest = XMLHttpRequest { unXMLHttpRequest :: JSVal }
 
@@ -2446,7 +2492,10 @@ removeAllRanges :: (MonadIO m) => Selection -> m ()
 removeAllRanges s = liftIO $ js_removeAllRanges s
 
 foreign import javascript unsafe "$1[\"toString\"]()"
- selectionToString :: Selection -> IO JSString
+ js_selectionToString :: Selection -> IO JSString
+
+selectionToString :: (MonadIO m) => Selection -> m JSString
+selectionToString s = liftIO $ js_selectionToString s
 
 foreign import javascript unsafe "$1[\"containsNode\"]($2,$3)"
  js_containsNode :: Selection -> JSNode -> Bool -> IO Bool
@@ -2901,6 +2950,12 @@ foreign import javascript unsafe "$1[\"replace\"]($2)"
 
 replaceToken :: (MonadIO m) => DOMTokenList -> JSString -> JSString -> m Bool
 replaceToken dtl old new = liftIO $ js_replaceToken dtl old new
+
+foreign import javascript unsafe "$1[\"contains\"]($2)"
+        js_containsToken :: DOMTokenList -> JSString -> IO Bool
+
+containsToken :: (MonadIO m) => DOMTokenList -> JSString -> m Bool
+containsToken lst tkn = liftIO $ js_containsToken lst tkn
 
 foreign import javascript unsafe "$r = $1[\"classList\"]"
         js_classList :: JSElement -> IO DOMTokenList
