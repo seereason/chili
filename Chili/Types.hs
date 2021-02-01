@@ -318,11 +318,11 @@ foreign import javascript unsafe "$1 instanceof DocumentFragment"
   js_instanceOfJSDocumentFragment :: JSVal -> Bool
 
 foreign import javascript unsafe "$1[\"firstElementChild\"]"
-        js_firstElementChild :: JSDocumentFragment -> IO JSVal
+        js_firstElementChild :: JSVal -> IO JSVal
 
-firstElementChild :: (MonadIO m) => JSDocumentFragment -> m (Maybe JSElement)
-firstElementChild df
-  = liftIO ((js_firstElementChild df) >>= fromJSVal)
+firstElementChild :: (MonadIO m, ToJSVal parent, IsParentNode parent) => parent -> m (Maybe JSElement)
+firstElementChild p
+  = liftIO (fromJSVal =<< js_firstElementChild =<< toJSVal p)
 
 
 
@@ -331,6 +331,9 @@ firstElementChild df
 newtype JSDocument = JSDocument JSVal
 
 unJSDocument (JSDocument o) = o
+
+class DocumentOrShadowRoot a
+instance DocumentOrShadowRoot JSDocument
 
 instance ToJSVal JSDocument where
   toJSVal = pure . unJSDocument
@@ -1079,6 +1082,47 @@ foreign import javascript unsafe "$1[\"dataset\"][$2] = $3"
 
 setData :: (MonadIO m, IsJSNode self) => self -> JSString -> JSString -> m ()
 setData self name value = liftIO (js_setData (toJSNode self) name value)
+
+-- * ShadowRoot
+
+newtype JSShadowRoot = JSShadowRoot { unJSShadowRoot :: JSVal }
+
+instance DocumentOrShadowRoot JSShadowRoot
+
+instance ToJSVal JSShadowRoot where
+  toJSVal = return . unJSShadowRoot
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal JSShadowRoot where
+  fromJSVal = return . fmap JSShadowRoot . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance PFromJSVal JSShadowRoot where
+  pFromJSVal = JSShadowRoot
+  {-# INLINE pFromJSVal #-}
+
+instance IsJSNode JSShadowRoot where
+   toJSNode = JSNode . unJSShadowRoot
+
+
+data ShadowRootMode
+  = OpenRoot
+  | ClosedRoot
+    deriving (Eq, Ord, Read, Show, Enum)
+
+foreign import javascript unsafe "$1[\"attachShadow\"]({mode: $2, delegatesFocus: $3})"
+        js_attachShadow :: JSElement -> JSString -> Bool -> IO JSShadowRoot
+
+attachShadow :: (MonadIO m) =>
+                JSElement
+             -> ShadowRootMode
+             -> Bool  -- ^ delegate focus
+             -> m JSShadowRoot
+attachShadow root mode delegateFocus = liftIO $ js_attachShadow root modeStr delegateFocus
+  where
+    modeStr = case mode of
+      OpenRoot   -> "open"
+      ClosedRoot -> "closed"
 
 -- * JSTextNode
 
