@@ -20,7 +20,7 @@ import Control.Concurrent.STM.TMVar (TMVar, putTMVar, takeTMVar)
 import Data.Aeson (FromJSON, ToJSON, decodeStrict, encode)
 import qualified Data.ByteString.Lazy.Char8 as C
 import Data.Char as Char (toLower)
-import Data.Maybe (fromJust, fromMaybe)
+import Data.Maybe (fromJust, fromMaybe, catMaybes)
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.String (fromString)
@@ -228,6 +228,20 @@ getLength self
 -- foreign import javascript unsafe "$1[\"length\"]" js_getLength ::
 --         JSVal NodeList -> IO Word
 
+-- * contenteditable
+
+foreign import javascript unsafe "$1[\"contentEditable\"] = $2"
+  js_setContentEditable :: JSElement -> Bool -> IO ()
+
+setContentEditable :: (MonadIO m) => JSElement -> Bool -> m ()
+setContentEditable e b = liftIO $ js_setContentEditable e b
+
+foreign import javascript unsafe "$r = $1[\"contentEditable\"]"
+  js_getContentEditable :: JSElement -> IO Bool
+
+getContentEditable :: (MonadIO m) => JSElement -> m Bool
+getContentEditable e = liftIO $ js_getContentEditable e
+
 foreign import javascript unsafe "$1[\"contains\"]($2)"
    js_contains :: JSNode -> JSNode -> IO Bool
 
@@ -324,6 +338,12 @@ firstElementChild :: (MonadIO m, ToJSVal parent, IsParentNode parent) => parent 
 firstElementChild p
   = liftIO (fromJSVal =<< js_firstElementChild =<< toJSVal p)
 
+foreign import javascript unsafe "$1[\"lastElementChild\"]"
+        js_lastElementChild :: JSVal -> IO JSVal
+
+lastElementChild :: (MonadIO m, ToJSVal parent, IsParentNode parent) => parent -> m (Maybe JSElement)
+lastElementChild p
+  = liftIO (fromJSVal =<< js_lastElementChild =<< toJSVal p)
 
 
 -- * JSDocument
@@ -582,6 +602,18 @@ foreign import javascript unsafe "$1[\"getSelection\"]()"
 getSelection :: (MonadIO m) => JSWindow -> m Selection
 getSelection w = liftIO (js_getSelection w)
 
+foreign import javascript unsafe "$r = $1[\"scrollX\"]"
+  js_scrollX :: JSWindow -> IO Double
+
+scrollX :: (MonadIO m) => JSWindow -> m Double
+scrollX w = liftIO (js_scrollX w)
+
+foreign import javascript unsafe "$r = $1[\"scrollY\"]"
+  js_scrollY :: JSWindow -> IO Double
+
+scrollY :: (MonadIO m) => JSWindow -> m Double
+scrollY w = liftIO (js_scrollY w)
+
 -------------------------
 -- * JSElement
 -------------------------
@@ -636,6 +668,7 @@ foreign import javascript unsafe "$1[\"createElement\"]($2)"
         JSDocument -> JSString -> IO JSElement
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/JSDocument.createJSElement Mozilla JSDocument.createJSElement documentation>
+-- FIXME: can this actually return Nothing?
 createJSElement :: (MonadIO m) => JSDocument -> Text -> m (Maybe JSElement)
 createJSElement document tagName
   = liftIO ((js_createJSElement document (textToJSString tagName))
@@ -684,6 +717,10 @@ childNodes :: (MonadIO m, IsJSNode self) => self -> m JSNodeList
 childNodes self
     = liftIO (js_childNodes (toJSNode self))
 
+class (IsJSNode obj) => DocumentOrElement obj
+instance DocumentOrElement JSDocument
+instance DocumentOrElement JSElement
+
 -- * getElementsByName
 
 foreign import javascript unsafe "$1[\"getElementsByName\"]($2)"
@@ -714,16 +751,15 @@ getElementsByClassNameE elem elementName
 
 foreign import javascript unsafe "$1[\"getElementsByTagName\"]($2)"
         js_getElementsByTagName ::
-        JSDocument -> JSString -> IO JSNodeList
+        JSNode -> JSString -> IO JSNodeList
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Document.getElementsByTagName Mozilla Document.getElementsByTagName documentation>
-getElementsByTagName ::
-                     (MonadIO m) =>
-                       JSDocument -> JSString -> m (Maybe JSNodeList)
+getElementsByTagName :: (DocumentOrElement obj, MonadIO m) =>
+                        obj
+                     -> JSString
+                     -> m (Maybe JSNodeList)
 getElementsByTagName self tagname
-  = liftIO
-      ((js_getElementsByTagName self tagname)
-       >>= return . Just)
+  = liftIO ((js_getElementsByTagName (toJSNode self) tagname) >>= return . Just)
 
 foreign import javascript unsafe "$1[\"getElementById\"]($2)"
         js_getElementsById ::
@@ -946,7 +982,7 @@ nextSibling self
 foreign import javascript unsafe "$1[\"nextElementSibling\"]"
         js_nextElementSibling :: JSNode -> IO JSVal
 
--- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.nextSibling Mozilla Node.nextSibling documentation>
+-- | <https://developer.mozilla.org/en-us/docs/Web/API/NonDocumentTypeChildNode/nextElementSibling Mozilla nextElementSibling documentation>
 nextElementSibling :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSElement)
 nextElementSibling self
   = liftIO ((js_nextElementSibling ((toJSNode self))) >>= fromJSVal)
@@ -955,10 +991,20 @@ nextElementSibling self
 foreign import javascript unsafe "$1[\"previousSibling\"]"
         js_previousSibling :: JSNode -> IO JSVal
 
--- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.previousSibling Mozilla Node.nextSibling documentation>
+-- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.previousSibling Mozilla Node.previousSibling documentation>
 previousSibling :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
 previousSibling self
   = liftIO ((js_previousSibling ((toJSNode self))) >>= fromJSVal)
+
+-- * previousElementSibling
+
+foreign import javascript unsafe "$1[\"previousElementSibling\"]"
+        js_previousElementSibling :: JSNode -> IO JSVal
+
+-- | <https://developer.mozilla.org/en-us/docs/Web/API/NonDocumentTypeChildNode/previousElementSibling Mozilla previousElementSibling documentation>
+previousElementSibling :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSElement)
+previousElementSibling self
+  = liftIO ((js_previousElementSibling ((toJSNode self))) >>= fromJSVal)
 
 
 foreign import javascript unsafe "$1[\"setAttribute\"]($2, $3)"
@@ -1167,6 +1213,14 @@ isEqualNode obj1 obj2 = liftIO $ js_isEqualNode (toJSNode obj1) (toJSNode obj2)
 
 foreign import javascript unsafe "$1[\"createTextNode\"]($2)"
         js_createTextNode :: JSDocument -> JSString -> IO JSTextNode
+
+-- * TextNode length
+
+foreign import javascript unsafe "$1[\"length\"]"
+        js_textNodeLength :: JSTextNode -> IO Int
+
+textNodeLength :: (MonadIO m) => JSTextNode -> m Int
+textNodeLength tn = liftIO (js_textNodeLength tn)
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Document.createTextNode Mozilla Document.createTextNode documentation>
 createJSTextNode :: (MonadIO m) => JSDocument -> Text -> m (Maybe JSTextNode)
@@ -1471,12 +1525,58 @@ instance IsEventObject (PopStateEventObject ev) where
   type Ev (PopStateEventObject ev) = ev
   asEventObject (PopStateEventObject jsval) = EventObject jsval
 
+-- * InputEvent
+
+data InputEvent
+  = Input
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+instance IsEvent InputEvent where
+  eventToJSString Input    = JS.pack "input"
+
+type instance UniqEventName Input   = "input"
+
+-- * InputEventObject
+
+newtype InputEventObject (ev :: InputEvent) = InputEventObject { unInputEventObject :: JSVal }
+
+instance Show (InputEventObject ev) where
+  show _ = "InputEventObject"
+
+instance ToJSVal (InputEventObject ev) where
+  toJSVal = return . unInputEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal (InputEventObject ev) where
+  fromJSVal = return . fmap InputEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject (InputEventObject ev) where
+  type Ev (InputEventObject ev) = ev
+  asEventObject (InputEventObject jsval) = EventObject jsval
+
+foreign import javascript unsafe "$r = $1[\"data\"]" js_inputData ::
+        InputEventObject ev -> Nullable JSString
+
+inputData :: InputEventObject ev -> Maybe JSString
+inputData ev = nullableToMaybe (js_inputData ev)
+
+foreign import javascript unsafe "$r = $1[\"dataTransfer\"]" js_dataTransfer ::
+        InputEventObject ev -> Nullable DataTransfer
+
+dataTransfer :: InputEventObject ev -> Maybe DataTransfer
+dataTransfer ev = nullableToMaybe (js_dataTransfer ev)
+
+foreign import javascript unsafe "$r = $1[\"inputType\"]" inputType ::
+        InputEventObject ev -> JSString
+
+foreign import javascript unsafe "$r = $1[\"isComposing\"]" isComposing ::
+        InputEventObject ev -> Bool
 
 -- * FormEvent
 
 data FormEvent
   = Change
-  | Input
   | Invalid
   | Reset
 --  | Search
@@ -1486,7 +1586,7 @@ data FormEvent
 
 instance IsEvent FormEvent where
   eventToJSString Change   = JS.pack "change"
-  eventToJSString Input    = JS.pack "input"
+--  eventToJSString Input    = JS.pack "input"
   eventToJSString Invalid  = JS.pack "invalid"
   eventToJSString Reset    = JS.pack "reset"
 --  eventToJSString Search   = JS.pack "search"
@@ -1494,7 +1594,6 @@ instance IsEvent FormEvent where
   eventToJSString Submit   = JS.pack "submit"
 
 type instance UniqEventName Change  = "change"
-type instance UniqEventName Input   = "input"
 type instance UniqEventName Invalid = "invalid"
 type instance UniqEventName Reset   = "reset"
 type instance UniqEventName Submit  = "submit"
@@ -1864,6 +1963,8 @@ foreign import javascript unsafe "$1[\"keyCode\"]" keyCode ::
 foreign import javascript unsafe "$1[\"which\"]" which ::
         (KeyboardEventObject ev) -> Int
 
+foreign import javascript unsafe "$1[\"repeat\"]" repeat ::
+        (KeyboardEventObject ev) -> Bool
 
 class HasModifierKeys obj where
   shiftKey :: obj -> Bool
@@ -2009,6 +2110,7 @@ type family EventObjectOf (event :: k) :: o where
   EventObject (ev :: FocusEvent)            = FocusEventObject ev
   EventObject (ev :: FormEvent)             = EventObject ev
   EventObject (ev :: HashChangeEvent)       = HashChangeEventObject ev
+  EventObject (ev :: InputEvent)            = InputEventObject ev
   EventObject (ev :: KeyboardEvent)         = KeyboardEventObject ev
   EventObject (ev :: MediaEvent)            = EventObject ev
   EventObject (ev :: MessageEvent)          = MessageEventObject ev
@@ -2121,7 +2223,11 @@ dispatchEvent et ev = liftIO $ js_dispatchEvent (toEventTarget et) (asEventObjec
 
 -- * DOMRect
 
-newtype DOMClientRect = DomClientRect { unDomClientRect :: JSVal }
+newtype DOMClientRect = DOMClientRect { unDomClientRect :: JSVal }
+
+instance PFromJSVal DOMClientRect where
+  pFromJSVal = DOMClientRect
+  {-# INLINE pFromJSVal #-}
 
 foreign import javascript unsafe "$1[\"width\"]" width ::
          DOMClientRect -> Double
@@ -2146,6 +2252,9 @@ foreign import javascript unsafe "$1[\"getBoundingClientRect\"]()" js_getBoundin
 
 getBoundingClientRect :: (MonadIO m) => JSElement -> m DOMClientRect
 getBoundingClientRect = liftIO . js_getBoundingClientRect
+
+showDOMClientRect :: DOMClientRect -> String
+showDOMClientRect rect = "{ rectLeft = " ++ show (rectLeft rect) ++ " , rectTop = " ++ show (rectTop rect) ++ " , rectRight = " ++ show (rectRight rect) ++ " , rectBottom = " ++ show (rectBottom rect)  ++ " , height = " ++ show (height rect) ++ " , width = " ++ show (width rect) ++ " }"
 
 -- * offsetWidth
 
@@ -2493,6 +2602,18 @@ foreign import javascript unsafe "$r = $1[\"anchorOffset\"]"
 anchorOffset :: (MonadIO m) => Selection -> m Int
 anchorOffset s = liftIO (js_anchorOffset s)
 
+foreign import javascript unsafe "$r = $1[\"focusNode\"]"
+  js_focusNode :: Selection -> IO JSNode
+
+focusNode :: (MonadIO m) => Selection -> m JSNode
+focusNode s = liftIO (js_focusNode s)
+
+foreign import javascript unsafe "$r = $1[\"focusOffset\"]"
+  js_focusOffset :: Selection -> IO Int
+
+focusOffset :: (MonadIO m) => Selection -> m Int
+focusOffset s = liftIO (js_focusOffset s)
+
 foreign import javascript unsafe "$1[\"collapse\"]($2, $3)"
   js_collapse :: Selection -> JSNode -> Int -> IO ()
 
@@ -2583,6 +2704,13 @@ foreign import javascript unsafe "$1[\"deleteContents\"]()"
 deleteContents :: (MonadIO m) => Range -> m ()
 deleteContents r = liftIO $ js_deleteContents r
 
+foreign import javascript unsafe "$1[\"getBoundingClientRect\"]()" js_getRangeBoundingClientRect ::
+  Range -> IO DOMClientRect
+
+getRangeBoundingClientRect :: (MonadIO m) => Range -> m DOMClientRect
+getRangeBoundingClientRect = liftIO . js_getRangeBoundingClientRect
+
+
 foreign import javascript unsafe "$1[\"startContainer\"]"
         js_startContainer :: Range -> IO JSNode
 {-
@@ -2649,6 +2777,12 @@ foreign import javascript unsafe "$1[\"setStartBefore\"]($2)"
 setStartBefore :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
 setStartBefore r n = liftIO $ js_setStartBefore r (toJSNode n)
 
+foreign import javascript unsafe "$1[\"setStartAfter\"]($2)"
+  js_setStartAfter :: Range -> JSNode -> IO ()
+
+setStartAfter :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
+setStartAfter r n = liftIO $ js_setStartAfter r (toJSNode n)
+
 foreign import javascript unsafe "$1[\"setEnd\"]($2,$3)"
   js_setEnd :: Range -> JSNode -> Int -> IO ()
 
@@ -2661,6 +2795,48 @@ foreign import javascript unsafe "$1[\"setEndBefore\"]($2)"
 setEndBefore :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
 setEndBefore r n = liftIO $ js_setEndBefore r (toJSNode n)
 
+foreign import javascript unsafe "$1[\"setEndAfter\"]($2)"
+  js_setEndAfter :: Range -> JSNode -> IO ()
+
+setEndAfter :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
+setEndAfter r n = liftIO $ js_setEndAfter r (toJSNode n)
+
+
+-- * HTMLCollection -- a bit like an array, but not
+
+newtype HTMLCollection a = HTMLCollection { unHTMLCollection :: JSVal }
+
+instance ToJSVal (HTMLCollection a) where
+  toJSVal = pure . unHTMLCollection
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal (HTMLCollection a) where
+  fromJSVal = pure . fmap HTMLCollection . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+foreign import javascript unsafe "$1[\"item\"]($2)" js_collectionItem ::
+        HTMLCollection a -> Int -> IO (Nullable a)
+
+collectionItem :: (MonadIO m, PFromJSVal a) => HTMLCollection a -> Int -> m (Maybe a)
+collectionItem col n =
+  liftIO (nullableToMaybe <$> js_collectionItem col n)
+
+foreign import javascript unsafe "$1[\"length\"]" js_collectionLength ::
+        HTMLCollection a -> IO Int
+
+collectionLength :: (MonadIO m) => HTMLCollection a -> m Int
+collectionLength col =
+  liftIO (js_collectionLength col)
+
+collectionItems :: (MonadIO m, PFromJSVal a) => HTMLCollection a -> m [a]
+collectionItems hc =
+  do l <- collectionLength hc
+     mItems <- mapM (\i -> collectionItem hc i) [0..(pred l)]
+     pure $ catMaybes mItems
+
+
+-- * ClientRect
+{-
 newtype ClientRects = ClientRects { unClientRects :: JSVal }
 
 instance ToJSVal ClientRects where
@@ -2670,13 +2846,18 @@ instance ToJSVal ClientRects where
 instance FromJSVal ClientRects where
   fromJSVal = return . fmap ClientRects . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
+-}
 
-foreign import javascript unsafe "$1[\"getClientRects\"]"
-  js_getClientRects :: Range -> IO ClientRects
+foreign import javascript unsafe "$1[\"getClientRects\"]()"
+  js_getClientRects :: JSVal -> IO (HTMLCollection DOMClientRect)
 
-getClientRects :: (MonadIO m) => Range -> m ClientRects
-getClientRects r = liftIO $ js_getClientRects r
+getElementClientRects :: (MonadIO m) => JSElement -> m (HTMLCollection DOMClientRect)
+getElementClientRects e = liftIO $ js_getClientRects (unJSElement e)
 
+getRangeClientRects :: (MonadIO m) => Range -> m (HTMLCollection DOMClientRect)
+getRangeClientRects r = liftIO $ js_getClientRects (unRange r)
+
+{-
 newtype ClientRect = ClientRect { unClientRect :: JSVal }
 
 instance ToJSVal ClientRect where
@@ -2708,7 +2889,7 @@ foreign import javascript unsafe "$1[\"top\"]"
 crTop :: (MonadIO m) => ClientRect -> m Int
 crTop cr = liftIO $ js_crTop cr
 -}
-
+-}
 -- Note: probably returns ClientRectList -- similar to NodeList
 -- foreign import javascript unsfae "$1[\"getClientRects\"]()"
 --  js_getClientRects :: Range -> IO JSVal
@@ -2780,6 +2961,12 @@ instance FromJSVal DataTransfer where
   fromJSVal = pure . fmap DataTransfer . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
+instance PFromJSVal DataTransfer where
+  pFromJSVal = DataTransfer
+  {-# INLINE pFromJSVal #-}
+
+
+
 foreign import javascript unsafe "$1[\"getData\"]($2)" js_getDataTransferData ::
         DataTransfer -> JSString -> IO JSString
 
@@ -2797,6 +2984,14 @@ setDataTransferData :: DataTransfer
                     -> JSString -- ^ data
                     -> IO ()
 setDataTransferData dataTransfer format data_ = (js_setDataTransferData dataTransfer format data_)
+foreign import javascript unsafe "$1[\"types\"]" js_getTypes ::
+        DataTransfer -> IO JSVal
+
+-- | <https://developer.mozilla.org/en-US/docs/Web/API/DataTransfer.types Mozilla DataTransfer.types documentation> 
+getTypes ::
+         (MonadIO m) => DataTransfer -> m [JSString]
+getTypes self = liftIO ((js_getTypes self) >>= fromJSValUnchecked)
+
 
 -- * DataTransferItem
 
@@ -3007,3 +3202,17 @@ foreign import javascript unsafe "$r = $1[\"classList\"]"
 classList :: (MonadIO m) => JSElement -> m DOMTokenList
 classList e = liftIO $ js_classList e
 
+-- * CharacterData
+
+-- | https:\/\/developer.mozilla.org\/en-US\/docs\/Web\/API\/CharacterData
+class (IsJSNode obj) => CharacterData obj
+instance CharacterData JSTextNode
+
+
+foreign import javascript unsafe "$1[\"data\"]"
+    js_data :: JSNode -> IO JSString
+
+
+-- | object.data
+getCharacterData :: (CharacterData obj) => obj -> IO JSString
+getCharacterData o = js_data (toJSNode o)
