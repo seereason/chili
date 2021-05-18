@@ -50,6 +50,14 @@ updateView (DHandle root vdom doc) newHtml =
      putMVar vdom newHtml
      pure ()
 
+updateViewP :: DHandle -> Html -> IO ()
+updateViewP (DHandle root vdom doc) newHtml =
+  do oldHtml <- takeMVar vdom
+     let patches = diff oldHtml (Just newHtml)
+     apply doc (toJSNode root) oldHtml patches
+     putMVar vdom newHtml
+     pure ()
+
 
 apply :: JSDocument -> JSNode -> Html -> Map Int [Patch] -> IO ()
 apply document rootNode vdom patches =
