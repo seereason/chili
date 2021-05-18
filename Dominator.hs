@@ -2,7 +2,7 @@
 {-# language FlexibleContexts #-}
 module Dominator where
 
-import Chili.Types (EventObjectOf(..), IsEvent(..), IsJSNode(toJSNode), JSDocument, JSElement(..), JSTextNode, JSNode, addEventListener, currentDocument, getElementById, getElementsByTagName, getLength, item, removeChildren, setAttribute, setProperty, unJSNode)
+import Chili.Types (EventObjectOf(..), IsEvent(..), IsJSNode(toJSNode), JSDocument, JSElement(..), JSTextNode, JSNode, addEventListener, addEventListenerOpt, currentDocument, getElementById, getElementsByTagName, getLength, item, removeChildren, setAttribute, setProperty, unJSNode)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar)
 import Control.Monad.Trans (MonadIO(liftIO))
 import Data.JSString (JSString)

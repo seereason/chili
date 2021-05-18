@@ -8,7 +8,7 @@ import Control.Concurrent.MVar (takeMVar, putMVar)
 import Control.Monad (when)
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans (MonadIO(..))
-import Chili.Types (JSDocument, JSElement(..), JSNode, JSNodeList, unJSNode, addEventListener, currentDocument, childNodes, deleteProperty, getFirstChild, getLength, item, parentNode, nodeType, item, toJSNode, removeAttribute, removeChild, replaceData, replaceChild, setAttribute, setProperty, insertBefore)
+import Chili.Types (JSDocument, JSElement(..), JSNode, JSNodeList, unJSNode, addEventListener, addEventListenerOpt, currentDocument, childNodes, deleteProperty, eventName, getFirstChild, getLength, item, parentNode, nodeType, item, toJSNode, removeAttribute, removeChild, replaceData, replaceChild, setAttribute, setProperty, insertBefore)
 import Data.List (sort)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -35,11 +35,12 @@ renderHtml doc (Element tag mKey attrs children) =
     where
       doAttr elem (Attr k v)   = setAttribute elem k v
       doAttr elem (Prop k v)   = setProperty elem k v
---      doAttr elem (OnCreate f) = liftIO $ do cb <- asyncCallback $ f elem model
---                                             js_setTimeout cb 0
       doAttr elem (EL eventType eventHandler) = do
-        liftIO $ debugStrLn $ "Adding event listener for " ++ show eventType
+        liftIO $ debugStrLn $ "Adding event listener for " ++ eventName eventType
         addEventListener elem eventType (\e -> {- putStrLn "eventHandler start" >> -} (eventHandler e) {- >> putStrLn "eventHandler end"-}) False
+      doAttr elem (ELO eventType opts eventHandler) = do
+        liftIO $ debugStrLn $ "Adding event listener for " ++ eventName eventType
+        addEventListenerOpt elem eventType (\e -> {- putStrLn "eventHandler start" >> -} (eventHandler e) {- >> putStrLn "eventHandler end"-}) opts
       doAttr _ (OnCreate _) = error "Dominator.Patch.renderHtml"
 
 updateView :: DHandle -> Html -> IO ()

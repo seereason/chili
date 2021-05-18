@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds, ScopedTypeVariables #-}
 {-# language RankNTypes #-}
 {- Apply some patches -}
 module Chili.Patch where
@@ -17,7 +17,7 @@ import Data.Text (unpack)
 import qualified Data.Text as Text
 import Chili.Diff (Patch(..), diff)
 import Chili.Internal (debugStrLn, debugPrint)
-import Chili.Types (Control(..), Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, VDOMEvent(..), WithModel, addEventListener, childNodes, createJSElement, createJSTextNode, item, js_setTimeout, getFirstChild, getLength, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, toJSNode, appendChild, descendants, nodeType, currentDocument, newEvent, dispatchEvent)
+import Chili.Types (Control(..), EventName(..), Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, VDOMEvent(..), WithModel, addEventListener, childNodes, createJSElement, createJSTextNode, item, js_setTimeout, eventName, getFirstChild, getLength, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, toJSNode, appendChild, descendants, nodeType, currentDocument, newEvent, dispatchEvent)
 import Chili.TDVar (TDVar, readTDVar, cleanTDVar, isDirtyTDVar)
 import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
 
@@ -47,7 +47,7 @@ renderHtml loop model sendWS htmlV doc body (Element tag attrs children) view =
       doAttr elem (OnCreate f) = liftIO $ do cb <- asyncCallback $ f elem model
                                              js_setTimeout cb 0
       doAttr elem (EL eventType eventHandler) = do
-        liftIO $ debugStrLn $ "Adding event listener for " ++ show eventType
+        liftIO $ debugStrLn $ "Adding event listener for " ++ eventName eventType
         addEventListener elem eventType (\e -> {- putStrLn "eventHandler start" >> -} (handleAndUpdate eventHandler e model) {- >> putStrLn "eventHandler end"-}) False
 
       handleAndUpdate eventHandler e model =
@@ -91,7 +91,7 @@ updateView loop model sendWS htmlV doc body view = do
                      apply loop model sendWS htmlV doc body view body oldHtml patches
                      atomically $ putTMVar htmlV newHtml
                      (Just node) <- getFirstChild body
-                     vdomEventObject <- newEvent Redrawn True True
+                     vdomEventObject <- newEvent (EventName :: EventName Redrawn) True True
                      dispatchEvent node vdomEventObject
                      pure ()
 

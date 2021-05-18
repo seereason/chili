@@ -1,6 +1,7 @@
 *~
 *.js_*
 dist
+dist-newstyle
 *.jsexe
 *.o
 *.dyn_o
@@ -10,4 +11,5 @@ dist
 cabal.sandbox.config
 result
 .cabal-sandbox
+domc
 

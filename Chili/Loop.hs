@@ -14,7 +14,7 @@ import Data.Aeson (FromJSON, ToJSON, decodeStrict, encode)
 import Data.JSString.Text (textToJSString)
 import qualified Data.JSString as JS
 import Data.Text (Text)
-import JavaScript.Web.MessageEvent (MessageEvent(..))
+import JavaScript.Web.MessageEvent as MessageEvent (MessageEvent(..))
 
 {-
 -- this solution does not work because the event handler code is run
@@ -56,7 +56,7 @@ loop :: forall remote model. (ToJSON remote) =>
      -> model
      -> ((remote -> IO ()) -> TDVar model -> IO ())
      -> Maybe JS.JSString
-     -> ((remote -> IO ()) -> MessageEvent -> TDVar model -> IO ())
+     -> ((remote -> IO ()) -> MessageEvent.MessageEvent -> TDVar model -> IO ())
      -> ((remote -> IO ()) -> model -> Html model)
      -> IO (TDVar model)
 loop doc body initModel initAction murl handleWS view =
