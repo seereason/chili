@@ -46,15 +46,15 @@ renderHtml doc (Element tag mKey attrs children) =
 updateView :: DHandle -> Html -> IO ()
 updateView (DHandle root vdom doc) newHtml =
   do oldHtml <- takeMVar vdom
-     let patches = diff oldHtml (Just newHtml)
+     let patches = diff (const False) oldHtml (Just newHtml)
      apply doc (toJSNode root) oldHtml patches
      putMVar vdom newHtml
      pure ()
 
-updateViewP :: DHandle -> Html -> IO ()
-updateViewP (DHandle root vdom doc) newHtml =
+updateViewP :: (Html -> Bool) -> DHandle -> Html -> IO ()
+updateViewP isProtected (DHandle root vdom doc) newHtml =
   do oldHtml <- takeMVar vdom
-     let patches = diff oldHtml (Just newHtml)
+     let patches = diff isProtected oldHtml (Just newHtml)
      apply doc (toJSNode root) oldHtml patches
      putMVar vdom newHtml
      pure ()

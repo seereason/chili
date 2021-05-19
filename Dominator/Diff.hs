@@ -30,8 +30,8 @@ instance Show Patch where
   show (Insert node)      = "Insert " <> show node
   show Remove             = "Remove"
 
-diff :: Html -> Maybe Html -> Map Int [Patch]
-diff a b = Map.fromListWith (flip (++)) (walk a b 0)
+diff :: (Html -> Bool) -> Html -> Maybe Html -> Map Int [Patch]
+diff isProtected a b = Map.fromListWith (flip (++)) (walk isProtected a b 0)
 
 -- FIXME: does not handle changes to Events or Properties
 -- FIXME: we should be able to add and remove single attributes
@@ -56,8 +56,8 @@ diffAttrs attrsA attrsB index =
              then []
              else [(index, [Props attrsB])]
 -}
-walk :: Html -> Maybe Html -> Int -> [(Int, [Patch])]
-walk a mb index =
+walk :: (Html -> Bool) -> Html -> Maybe Html -> Int -> [(Int, [Patch])]
+walk isProtected a mb index =
   case mb of
    Nothing -> [(index, [Remove])]
    (Just b@(Element tagNameB mKeyB attrsB childrenB)) ->
@@ -65,7 +65,8 @@ walk a mb index =
       (Element tagNameA mKeyA attrsA childrenA)
         | tagNameA == tagNameB {- && keyA == keyB -} ->
             let propsPatches    = diffAttrs attrsA attrsB index
-                childrenPatches = diffChildren index childrenA childrenB index
+                childrenPatches = if isProtected a then mempty
+                                  else diffChildren isProtected index childrenA childrenB index
             in propsPatches ++ childrenPatches
       _ -> [(index, [VNode b])]
    (Just (CData txtB)) ->
@@ -97,19 +98,19 @@ What happens if some of the nodes do not have keys?
 
 -}
 
-diffChildren :: Int -> [Html] -> [Html] -> Int -> [(Int, [Patch])]
-diffChildren parentIndex childrenA childrenB' index =
+diffChildren :: (Html -> Bool) -> Int -> [Html] -> [Html] -> Int -> [(Int, [Patch])]
+diffChildren isProtected parentIndex childrenA childrenB' index =
   let -- FIXME: disabled reorder because it is broken. Fix it!
       -- (childrenB, moves) = trace ("childrenA = " ++ show childrenA ++ " childrenB = " ++ show childrenB') (reorder childrenA childrenB')
       (childrenB, moves) = (childrenB', [])
       patches = case (childrenA, childrenB) of
         ([], []) -> []
         ([], (b:bs)) ->
-          (parentIndex, [Insert b]) : diffChildren parentIndex [] bs (index + 1)
+          (parentIndex, [Insert b]) : diffChildren isProtected parentIndex [] bs (index + 1)
         ((a:as), []) ->
-          (walk a Nothing  (index + 1)) ++ (diffChildren parentIndex as [] (index + 1 + (elementDescendants' a)))
+          (walk isProtected a Nothing  (index + 1)) ++ (diffChildren isProtected parentIndex as [] (index + 1 + (elementDescendants' a)))
         ((a:as), (b:bs)) ->
-          (walk a (Just b) (index + 1)) ++ (diffChildren parentIndex as bs (index + 1 + (elementDescendants' a)))
+          (walk isProtected a (Just b) (index + 1)) ++ (diffChildren isProtected parentIndex as bs (index + 1 + (elementDescendants' a)))
   in if (null moves)
      then patches
      else (patches ++ [(index, [Reorder moves])])
