@@ -47,6 +47,8 @@ library
                   Dominator.Patch
                   Dominator.HSX
                   Dominator.Types
+                  Dominator.DiffPartial
+                  Dominator.PatchPartial
 
 Test-suite spec
   main-is:             Spec.hs
