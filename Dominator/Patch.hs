@@ -8,6 +8,7 @@ import Control.Concurrent.MVar (takeMVar, putMVar)
 import Control.Monad (when)
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans (MonadIO(..))
+import Chili.Debug (Debug)
 import Chili.Types (JSDocument, JSElement(..), JSNode, JSNodeList, unJSNode, addEventListener, addEventListenerOpt, currentDocument, childNodes, deleteProperty, eventName, getFirstChild, getLength, item, parentNode, nodeType, item, toJSNode, removeAttribute, removeChild, replaceData, replaceChild, setAttribute, setProperty, insertBefore)
 import Data.List (sort)
 import Data.Map (Map)
@@ -24,7 +25,7 @@ import Chili.TDVar (TDVar, readTDVar, cleanTDVar, isDirtyTDVar)
 import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
 
 -- should we attach the DOM nodes to the VDOM? would that simplify diff/patch?
-renderHtml :: JSDocument -> Html -> IO JSNode
+renderHtml :: Debug => JSDocument -> Html -> IO JSNode
 renderHtml doc (CData t) =
   toJSNode <$> createJSTextNode doc t
 renderHtml doc (Element tag mKey attrs children) =
@@ -43,7 +44,7 @@ renderHtml doc (Element tag mKey attrs children) =
         addEventListenerOpt elem eventType (\e -> {- putStrLn "eventHandler start" >> -} (eventHandler e) {- >> putStrLn "eventHandler end"-}) opts
       doAttr _ (OnCreate _) = error "Dominator.Patch.renderHtml"
 
-updateView :: DHandle -> Html -> IO ()
+updateView :: Debug => DHandle -> Html -> IO ()
 updateView (DHandle root vdom doc) newHtml =
   do oldHtml <- takeMVar vdom
      let patches = diff (const False) oldHtml (Just newHtml)
@@ -51,7 +52,7 @@ updateView (DHandle root vdom doc) newHtml =
      putMVar vdom newHtml
      pure ()
 
-updateViewP :: (Html -> Bool) -> DHandle -> Html -> IO ()
+updateViewP :: Debug => (Html -> Bool) -> DHandle -> Html -> IO ()
 updateViewP isProtected (DHandle root vdom doc) newHtml =
   do oldHtml <- takeMVar vdom
      let patches = diff isProtected oldHtml (Just newHtml)
@@ -60,7 +61,7 @@ updateViewP isProtected (DHandle root vdom doc) newHtml =
      pure ()
 
 
-apply :: JSDocument -> JSNode -> Html -> Map Int [Patch] -> IO ()
+apply :: Debug => JSDocument -> JSNode -> Html -> Map Int [Patch] -> IO ()
 apply document rootNode vdom patches =
   do let indices = Map.keys patches
      case indices of
@@ -73,7 +74,7 @@ apply document rootNode vdom patches =
                 mapM_ (apply' document rootNode patches) nodeList
                 return ()
 
-apply' :: JSDocument
+apply' :: Debug => JSDocument
        -> JSNode
        -> Map Int [Patch]
        -> (Int, JSNode)
@@ -85,7 +86,7 @@ apply' document rootNode patchMap (index, node) = do
           mapM_ (apply'' document rootNode node) patches
       Nothing -> error $ "Y NO PATCH? " ++ show index
 
-apply'' :: JSDocument
+apply'' :: Debug => JSDocument
         -> JSNode
         -> JSNode
         -> Patch
@@ -171,7 +172,7 @@ apply'' document body node patch =
            pure ()
       None -> error "Dominator.Patch.apply''"
 
-applyRemoves :: JSNode -> JSNodeList -> Map Text JSNode -> Moves -> IO (Map Text JSNode)
+applyRemoves :: Debug => JSNode -> JSNodeList -> Map Text JSNode -> Moves -> IO (Map Text JSNode)
 applyRemoves parent children keyMap [] = pure keyMap
 applyRemoves parent children keyMap (move:moves) =
   case move of
@@ -188,7 +189,7 @@ applyRemoves parent children keyMap (move:moves) =
          applyRemoves parent children keyMap' moves
     (InsertKey _ _) -> error "Dominator.Patch.applyRemoves"
 
-applyInserts :: JSNode -> JSNodeList -> Map Text JSNode -> Moves -> IO ()
+applyInserts :: Debug => JSNode -> JSNodeList -> Map Text JSNode -> Moves -> IO ()
 applyInserts parent children keyMap [] = pure ()
 applyInserts parent children keyMap (move:moves) =
   case move of
@@ -201,7 +202,7 @@ applyInserts parent children keyMap (move:moves) =
              applyInserts parent children keyMap moves
     (RemoveKey _ _) -> error "Dominator.Patch.applyInserts"
 
-getNodes :: JSNode      -- ^ root node of DOM
+getNodes :: Debug => JSNode      -- ^ root node of DOM
          -> Html -- ^ virtual DOM that matches the current DOM
          -> [Int]       -- ^ nodes indices we want (using in-order numbering)
          -> IO [(Int, JSNode)]

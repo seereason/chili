@@ -9,6 +9,7 @@ import Data.JSString (JSString)
 import qualified Data.JSString as JS
 import Data.JSString.Text (textToJSString, textFromJSString)
 import Data.Text (Text)
+import Chili.Debug (Debug)
 import Dominator.Types
 import Dominator.Patch (renderHtml)
 import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
@@ -29,7 +30,7 @@ single callback. It also makes it trivial to not update the DOM at
 all.
 -}
 
-attachById :: JSString -> IO (Maybe DHandle)
+attachById :: Debug => JSString -> IO (Maybe DHandle)
 attachById elemId =
   do (Just d) <- currentDocument
      me <- getElementById d elemId
@@ -43,7 +44,7 @@ attachById elemId =
                                   }
 
 -- | attach to the first tag with the name.. ideally something unique like '\<body\>'
-attachByTagName :: JSDocument -> JSString -> IO (Maybe DHandle)
+attachByTagName :: Debug => JSDocument -> JSString -> IO (Maybe DHandle)
 attachByTagName d tagName =
   do (Just elems) <- getElementsByTagName d tagName
      l <- getLength elems
@@ -56,7 +57,7 @@ attachByTagName d tagName =
                                      , doc = d
                                      }
 
-initView :: DHandle -> Html -> IO ()
+initView :: Debug => DHandle -> Html -> IO ()
 initView (DHandle root vdom doc) html =
   do node <- renderHtml doc html
      removeChildren root

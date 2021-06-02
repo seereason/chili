@@ -33,6 +33,7 @@ library
                   Chili.Canvas.Image
                   Chili.Canvas.ImageData
                   Chili.Canvas.Types
+                  Chili.Debug
                   Chili.Diff
                   Chili.HSX
                   Chili.Patch
