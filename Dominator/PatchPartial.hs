@@ -244,10 +244,41 @@ getNodes isProtected currNode vdom nodeIndices = do
                          return [(i, currNode)]
                   | otherwise ->
                      return []
-      getNodes' currNode vdom@(Element _tag _key _attrs children) is'' | isProtected vdom =
-          do index <- get
-             liftIO $ debugStrLn $ "getNodes' found isProtected = " ++ show index
-             return []
+      -- For protected nodes, do everything as for a normal element, just make it look as if there are no children.
+      getNodes' currNode vdom@(Element _tag _key _attrs children) (i:is'') | isProtected vdom =
+          do liftIO $ debugStrLn $ "getNodes _tag = " ++ show _tag ++ " is'' = " ++ show is''
+             let count = descendants children
+             index <- get
+             -- get the subset of indices which match this node or children of this node
+             case getInRange index count is'' of
+               [] -> do liftIO $ debugStrLn $ "getInRange index = " ++ show index ++ " count = " ++ show count ++ " is''= " ++ show is'' --
+                        return []
+               (i:is) ->
+                   do liftIO $ debugStrLn $ "inRange = " ++ show (i:is)
+                      liftIO $ debugStrLn $ "Element index = " ++ show index ++ " looking for i = " ++ show i
+                      when (i == index) $ liftIO $ debugStrLn $ "match Element on index = " ++ show index
+                      -- get the direct children of this parent node
+                      -- cs <- childNodes currNode
+                      -- get the number of direct children
+                      -- l <- fromIntegral <$> getLength cs
+                      let l = 0
+                      liftIO $ debugStrLn $ "l = "    ++ show l
+                      liftIO $ debugStrLn $ "vdom = " ++ show vdom
+                      let is' = if (i == index) then is else (i:is)
+                      liftIO $ debugStrLn $ "is' = " ++ show is'
+                      -- childNodes' <- mapM (\i' -> do (Just c) <- item cs (fromIntegral i')
+                      --                                liftIO $ debugStrLn $ "l = " ++ show l ++ ", length children = " ++ show (length children) ++ ", i' = " ++ show i'
+                      --                                inc
+
+                      --                                getNodes' c (children!!i') is'
+                      --                     ) [0..(l-1)]
+                      if (i == index)
+                      then do return $ [(i, currNode)]
+                      else return []
+                      -- if (i == index)
+                      -- then do return $ (i, currNode) : (concat childNodes')
+                      -- else return (concat childNodes')
+
       getNodes' currNode vdom@(Element _tag _key _attrs children) is'' =
           do liftIO $ debugStrLn $ "getNodes _tag = " ++ show _tag ++ " is'' = " ++ show is''
              let count = descendants children
