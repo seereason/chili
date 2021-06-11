@@ -8,6 +8,7 @@ import Control.Concurrent.MVar (takeMVar, putMVar)
 import Control.Monad (when)
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans (MonadIO(..))
+import Chili.Debug (Debug)
 import Chili.Types (JSDocument, JSElement(..), JSNode, JSNodeList, unJSNode, addEventListener, addEventListenerOpt, currentDocument, childNodes, deleteProperty, eventName, getFirstChild, getLength, item, parentNode, nodeType, item, toJSNode, removeAttribute, removeChild, replaceData, replaceChild, setAttribute, setProperty, insertBefore)
 import Data.List (sort)
 import Data.Map (Map)
@@ -41,7 +42,7 @@ import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCall
 --CB
 
 -- should we attach the DOM nodes to the VDOM? would that simplify diff/patch?
-renderHtml :: JSDocument -> Html -> IO JSNode
+renderHtml :: Debug => JSDocument -> Html -> IO JSNode
 renderHtml doc (CData t) =
   toJSNode <$> createJSTextNode doc t
 renderHtml doc (Element tag mKey attrs children) =
@@ -60,7 +61,7 @@ renderHtml doc (Element tag mKey attrs children) =
         addEventListenerOpt elem eventType (\e -> {- putStrLn "eventHandler start" >> -} (eventHandler e) {- >> putStrLn "eventHandler end"-}) opts
       doAttr _ (OnCreate _) = error "Dominator.Patch.renderHtml"
 
-updateView :: (Html -> Bool) -> DHandle -> Html -> IO ()
+updateView :: Debug => (Html -> Bool) -> DHandle -> Html -> IO ()
 updateView isProtected (DHandle root vdom doc) newHtml =
   do oldHtml <- takeMVar vdom
      let patches = diff isProtected oldHtml (Just newHtml)
@@ -93,7 +94,7 @@ apply' document rootNode patchMap (index, node) = do
           mapM_ (apply'' document rootNode node) patches
       Nothing -> error $ "Y NO PATCH? " ++ show index
 
-apply'' :: JSDocument
+apply'' :: Debug => JSDocument
         -> JSNode
         -> JSNode
         -> Patch
@@ -179,7 +180,7 @@ apply'' document body node patch =
            pure ()
       None -> error "Dominator.Patch.apply''"
 
-applyRemoves :: JSNode -> JSNodeList -> Map Text JSNode -> Moves -> IO (Map Text JSNode)
+applyRemoves :: Debug => JSNode -> JSNodeList -> Map Text JSNode -> Moves -> IO (Map Text JSNode)
 applyRemoves parent children keyMap [] = pure keyMap
 applyRemoves parent children keyMap (move:moves) =
   case move of
@@ -196,7 +197,7 @@ applyRemoves parent children keyMap (move:moves) =
          applyRemoves parent children keyMap' moves
     (InsertKey _ _) -> error "Dominator.Patch.applyRemoves"
 
-applyInserts :: JSNode -> JSNodeList -> Map Text JSNode -> Moves -> IO ()
+applyInserts :: Debug => JSNode -> JSNodeList -> Map Text JSNode -> Moves -> IO ()
 applyInserts parent children keyMap [] = pure ()
 applyInserts parent children keyMap (move:moves) =
   case move of
@@ -209,7 +210,7 @@ applyInserts parent children keyMap (move:moves) =
              applyInserts parent children keyMap moves
     (RemoveKey _ _) -> error "Dominator.Patch.applyInserts"
 
-getNodes :: (Html -> Bool)
+getNodes :: Debug => (Html -> Bool)
          -> JSNode      -- ^ root node of DOM
          -> Html -- ^ virtual DOM that matches the current DOM
          -> [Int]       -- ^ nodes indices we want (using in-order numbering)

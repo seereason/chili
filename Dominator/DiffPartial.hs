@@ -9,6 +9,7 @@ import Data.Monoid ((<>))
 import Data.Text (Text, pack)
 import qualified Data.Text as Text
 import Debug.Trace (trace)
+import Chili.Debug (Debug)
 import Dominator.Types (Html(..), Attr(..), descendants, flattenCData)
 
 data Patch
@@ -30,12 +31,12 @@ instance Show Patch where
   show (Insert node)      = "Insert " <> show node
   show Remove             = "Remove"
 
-diff :: (Html -> Bool) -> Html -> Maybe Html -> Map Int [Patch]
+diff :: Debug => (Html -> Bool) -> Html -> Maybe Html -> Map Int [Patch]
 diff isProtected a b = Map.fromListWith (flip (++)) (walk isProtected a b 0)
 
 -- FIXME: does not handle changes to Events or Properties
 -- FIXME: we should be able to add and remove single attributes
-diffAttrs :: [Attr] -> [Attr] -> Int -> [(Int, [Patch])]
+diffAttrs :: Debug => [Attr] -> [Attr] -> Int -> [(Int, [Patch])]
 diffAttrs attrsA attrsB index =
           let attrsA' = [(k,v) | Attr k v <- attrsA]
               attrsB' = [(k,v) | Attr k v <- attrsB]
@@ -56,7 +57,7 @@ diffAttrs attrsA attrsB index =
              then []
              else [(index, [Props attrsB])]
 -}
-walk :: (Html -> Bool) -> Html -> Maybe Html -> Int -> [(Int, [Patch])]
+walk :: Debug => (Html -> Bool) -> Html -> Maybe Html -> Int -> [(Int, [Patch])]
 walk isProtected a mb index =
   case mb of
    Nothing -> [(index, [Remove])]
@@ -98,7 +99,7 @@ What happens if some of the nodes do not have keys?
 
 -}
 
-diffChildren :: (Html -> Bool) -> Int -> [Html] -> [Html] -> Int -> [(Int, [Patch])]
+diffChildren :: Debug => (Html -> Bool) -> Int -> [Html] -> [Html] -> Int -> [(Int, [Patch])]
 diffChildren isProtected parentIndex childrenA childrenB' index =
   let -- FIXME: disabled reorder because it is broken. Fix it!
       -- (childrenB, moves) = trace ("childrenA = " ++ show childrenA ++ " childrenB = " ++ show childrenB') (reorder childrenA childrenB')
@@ -137,7 +138,7 @@ keyIndex elems =
 -}
 
 -- | create a Map from keys to elements and well as a list of elements that have no keys
-keyIndex :: [Html] -> (Map Text (Int, Html), [(Int, Html)]) -- ^ (keys, free)
+keyIndex :: Debug => [Html] -> (Map Text (Int, Html), [(Int, Html)]) -- ^ (keys, free)
 keyIndex elems =
   let (keys, free) = keyIndex' elems 0 ([], [])
   in (Map.fromList keys, free)
@@ -157,7 +158,7 @@ data Move
   | RemoveKey Int (Maybe Text)
     deriving (Eq, Ord, Read, Show)
 
-reorder :: [Html] -> [Html] -> ([Html], Moves)
+reorder :: Debug => [Html] -> [Html] -> ([Html], Moves)
 reorder aChildren bChildren =
   let (aKeys, aFree) = keyIndex aChildren
       (bKeys, bFree) = keyIndex bChildren
