@@ -10,6 +10,7 @@ import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans (MonadIO(..))
 import Chili.Debug (Debug)
 import Chili.Types (JSDocument, JSElement(..), JSNode, JSNodeList, unJSNode, addEventListener, addEventListenerOpt, currentDocument, childNodes, deleteProperty, eventName, getFirstChild, getLength, item, parentNode, nodeType, item, toJSNode, removeAttribute, removeChild, replaceData, replaceChild, setAttribute, setProperty, insertBefore)
+import Chili.Types (setAttributeSafe)
 import Data.List (sort)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -23,6 +24,7 @@ import Chili.Types (Control(..), Html(..), Attr(..), JSDocument, JSElement(..), 
 import Chili.TDVar (TDVar, readTDVar, cleanTDVar, isDirtyTDVar)
 -}
 import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
+import GHCJS.Types (JSException)
 
 -- PatchPartial and DiffPartial are clones of Patch/Diff that support partial trees of the DOM,
 -- i.e., trees whose leaves in the specification may actually have DOM elements attached to them.
@@ -51,7 +53,7 @@ renderHtml doc (Element tag mKey attrs children) =
      mapM_ (doAttr e) attrs
      pure (toJSNode e)
     where
-      doAttr elem (Attr k v)   = setAttribute elem k v
+      doAttr elem (Attr k v)   = setAttributeSafe elem k v
       doAttr elem (Prop k v)   = setProperty elem k v
       doAttr elem (EL eventType eventHandler) = do
         liftIO $ debugStrLn $ "Adding event listener for " ++ eventName eventType
@@ -78,7 +80,6 @@ apply isProtected document rootNode vdom patches =
                 -- debugStrLn $ "apply = " ++ show patches
                 (Just first) <- getFirstChild rootNode -- FIXME: handle Nothing
                 nodeList <- getNodes isProtected first vdom indices
-                -- debugStrLn $ "nodeList length = " ++ show (length nodeList)
                 mapM_ (apply' document rootNode patches) nodeList
                 return ()
 
@@ -127,7 +128,7 @@ apply'' document body node patch =
                         case (unpack k) of
 --                          "value" -> setValue e v -- FIXME: this causes issues with the cursor position
                           _ -> do debugStrLn $ "setAttribute " ++ show (k,v)
-                                  setAttribute e k v) [ (k,v) | Attr k v <- newProps ]
+                                  setAttributeSafe e k v) [ (k,v) | Attr k v <- newProps ]
              mapM_ (\(k, v) ->
                         case (unpack k) of
 --                          "value" -> setValue e v -- FIXME: this causes issues with the cursor position
