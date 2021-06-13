@@ -964,11 +964,22 @@ previousSibling self
 foreign import javascript unsafe "$1[\"setAttribute\"]($2, $3)"
         js_setAttribute :: JSElement -> JSString -> JSString -> IO ()
 
+foreign import javascript safe "$1[\"setAttribute\"]($2, $3)"
+        js_setAttributeSafe :: JSElement -> JSString -> JSString -> IO ()
+
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Element.setAttribute Mozilla Element.setAttribute documentation>
 setAttribute ::
              (MonadIO m) =>
                JSElement -> Text -> Text -> m ()
 setAttribute self name value
+  = liftIO
+      (js_setAttribute self (textToJSString name) (textToJSString value))
+
+-- | <https://developer.mozilla.org/en-US/docs/Web/API/Element.setAttribute Mozilla Element.setAttribute documentation>
+setAttributeSafe ::
+             (MonadIO m) =>
+               JSElement -> Text -> Text -> m ()
+setAttributeSafe self name value
   = liftIO
       (js_setAttribute self (textToJSString name) (textToJSString value))
 
