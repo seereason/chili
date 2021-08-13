@@ -2656,6 +2656,13 @@ foreign import javascript unsafe "$1[\"removeAllRanges\"]()"
 removeAllRanges :: (MonadIO m) => Selection -> m ()
 removeAllRanges s = liftIO $ js_removeAllRanges s
 
+
+foreign import javascript unsafe "$1[\"setBaseAndExtent\"]($2, $3, $4, $5)"
+  js_setBaseAndExtent :: Selection -> JSNode -> Int -> JSNode -> Int -> IO ()
+
+setBaseAndExtent :: (MonadIO m, IsJSNode an, IsJSNode fn) => Selection -> an -> Int -> fn -> Int -> m ()
+setBaseAndExtent s an ao fn fo = liftIO $ js_setBaseAndExtent s (toJSNode an) ao (toJSNode fn) fo
+
 foreign import javascript unsafe "$1[\"toString\"]()"
  js_selectionToString :: Selection -> IO JSString
 
