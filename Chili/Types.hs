@@ -248,6 +248,15 @@ foreign import javascript unsafe "$1[\"contains\"]($2)"
 contains :: (IsJSNode node, IsJSNode otherNode, MonadIO m) => node -> otherNode -> m Bool
 contains node otherNode = liftIO $ js_contains (toJSNode node) (toJSNode otherNode)
 
+-- * cloneNode
+
+foreign import javascript unsafe "$1[\"cloneNode\"]($2)"
+  js_cloneNode :: JSNode -> Bool -> IO JSNode
+
+cloneNode :: (MonadIO m, IsJSNode self) => self -> Bool -> m JSNode
+cloneNode self deep =
+  liftIO (js_cloneNode (toJSNode self) deep)
+
 -- * parentNode
 
 foreign import javascript unsafe "$1[\"parentNode\"]"
@@ -613,6 +622,18 @@ foreign import javascript unsafe "$r = $1[\"scrollY\"]"
 
 scrollY :: (MonadIO m) => JSWindow -> m Double
 scrollY w = liftIO (js_scrollY w)
+
+foreign import javascript unsafe "$r = $1[\"innerHeight\"]"
+  js_innerHeight :: JSWindow -> IO Double
+
+innerHeight :: (MonadIO m) => JSWindow -> m Double
+innerHeight w = liftIO (js_innerHeight w)
+
+foreign import javascript unsafe "$r = $1[\"innerWidth\"]"
+  js_innerWidth :: JSWindow -> IO Double
+
+innerWidth :: (MonadIO m) => JSWindow -> m Double
+innerWidth w = liftIO (js_innerWidth w)
 
 -------------------------
 -- * JSElement
