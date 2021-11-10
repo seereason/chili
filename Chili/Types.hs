@@ -578,6 +578,14 @@ instance FromJSVal JSWindow where
   fromJSVal = return . fmap JSWindow . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
+instance PFromJSVal JSWindow where
+  pFromJSVal = JSWindow
+  {-# INLINE pFromJSVal #-}
+
+instance PToJSVal JSWindow where
+  pToJSVal (JSWindow jsval) = jsval
+  {-# INLINE pToJSVal #-}
+
 instance IsEventTarget JSWindow where
     toEventTarget = EventTarget . unJSWindow
 
@@ -654,6 +662,10 @@ instance FromJSVal JSElement where
 instance PFromJSVal JSElement where
   pFromJSVal = JSElement
   {-# INLINE pFromJSVal #-}
+
+instance PToJSVal JSElement where
+  pToJSVal (JSElement jsval) = jsval
+  {-# INLINE pToJSVal #-}
 
 instance IsJSNode JSElement where
     toJSNode = JSNode . unJSElement
@@ -1091,6 +1103,65 @@ foreign import javascript unsafe "$1[\"checked\"] = $2"
 
 setChecked :: (MonadIO m) => JSElement -> Bool -> m ()
 setChecked e b = liftIO $ js_setChecked e b
+
+
+-- * Window/Element scroll position
+
+class (PToJSVal a) => Scrollable a
+instance Scrollable JSWindow
+instance Scrollable JSElement
+
+foreign import javascript unsafe "$1[\"scrollTop\"]" js_scrollTop ::
+        JSElement -> IO Double
+
+foreign import javascript unsafe "$1[\"scrollLeft\"]" js_scrollLeft ::
+        JSElement -> IO Double
+
+scrollTop :: (MonadIO m) => JSElement -> m Double
+scrollTop e = liftIO $ js_scrollTop e
+
+scrollLeft :: (MonadIO m) => JSElement -> m Double
+scrollLeft e = liftIO $ js_scrollLeft e
+
+data ScrollBehavior
+     = ScrollInstant
+     | ScrollSmooth
+     | ScrollAuto
+       deriving (Eq, Ord, Read, Show)
+
+jstrScrollBehavior :: ScrollBehavior -> JSString
+jstrScrollBehavior behavior =
+  case behavior of
+    ScrollInstant -> "instant"
+    ScrollSmooth  -> "smooth"
+    ScrollAuto    -> "auto"
+
+foreign import javascript unsafe "$1[\"scrollTo\"]({top: $2, left: $3, behavior: $4})" js_scrollTo ::
+    JSVal -> Double -> Double -> JSString -> IO ()
+
+scrollTo :: (MonadIO m, Scrollable obj) => obj -> Double -> Double -> ScrollBehavior -> m ()
+scrollTo obj top left behavior =
+  liftIO $ js_scrollTo (pToJSVal obj) top left (jstrScrollBehavior behavior)
+
+foreign import javascript unsafe "$1[\"scrollBy\"]({top: $2, left: $3, behavior: $4})" js_scrollBy ::
+    JSVal -> Double -> Double -> JSString -> IO ()
+
+scrollBy :: (MonadIO m, Scrollable obj) => obj -> Double -> Double -> ScrollBehavior -> m ()
+scrollBy obj top left behavior =
+  liftIO $ js_scrollBy (pToJSVal obj) top left (jstrScrollBehavior behavior)
+
+
+foreign import javascript unsafe "$r = $1[\"scrollWidth\"]"
+  js_scrollWidth :: JSElement -> IO Double
+
+scrollWidth :: (MonadIO m) => JSElement -> m Double
+scrollWidth e = liftIO (js_scrollWidth e)
+
+foreign import javascript unsafe "$r = $1[\"scrollHeight\"]"
+  js_scrollHeight :: JSElement -> IO Double
+
+scrollHeight :: (MonadIO m) => JSElement -> m Double
+scrollHeight e = liftIO (js_scrollHeight e)
 
 {-
 setCSS :: (MonadIO m) =>
@@ -2115,11 +2186,6 @@ instance FromJSVal (ProgressEventObject ev) where
   fromJSVal = return . fmap ProgressEventObject . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
-foreign import javascript unsafe "$1[\"scrollTop\"]" scrollTop ::
-        JSElement -> Int
-foreign import javascript unsafe "$1[\"scrollLeft\"]" scrollLeft ::
-        JSElement -> Int
-
 -- * EventObjectOf
 
 type family EventObjectOf (event :: k) :: o where
@@ -2276,6 +2342,9 @@ getBoundingClientRect = liftIO . js_getBoundingClientRect
 
 showDOMClientRect :: DOMClientRect -> String
 showDOMClientRect rect = "{ rectLeft = " ++ show (rectLeft rect) ++ " , rectTop = " ++ show (rectTop rect) ++ " , rectRight = " ++ show (rectRight rect) ++ " , rectBottom = " ++ show (rectBottom rect)  ++ " , height = " ++ show (height rect) ++ " , width = " ++ show (width rect) ++ " }"
+
+instance Show DOMClientRect where
+  show = showDOMClientRect
 
 -- * offsetWidth
 
