@@ -166,6 +166,12 @@ domc = QuasiQuoter
   , quoteDec  = domcDec
   }
 
+domcFile :: FilePath -> Q Exp
+domcFile fp =
+  do qAddDependentFile fp
+     c <- runIO $ readFile fp
+     domcExpr c
+
 forestToHtml :: Forest Token -> [Html]
 forestToHtml f = map (treeToHtml . normalizeTree) f
 

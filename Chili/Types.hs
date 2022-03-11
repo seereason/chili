@@ -1621,12 +1621,15 @@ instance IsEventObject (PopStateEventObject ev) where
 
 data InputEvent
   = Input
+  | BeforeInput
   deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 instance IsEvent InputEvent where
-  eventToJSString Input    = JS.pack "input"
+  eventToJSString Input       = JS.pack "input"
+  eventToJSString BeforeInput = JS.pack "beforeinput"
 
-type instance UniqEventName Input   = "input"
+type instance UniqEventName Input       = "input"
+type instance UniqEventName BeforeInput = "beforeinput"
 
 -- * InputEventObject
 

@@ -232,7 +232,7 @@ data Rect
          }
   deriving (Eq, Ord, Show, Read)
 
--- https://developer.mozilla.org/en-US/docs/Web/API/Path2D
+-- https://developer.mozilla.org/en-US/docs/Web/API/Path2
 data Path2D
   = MoveTo Double Double
   | LineTo Double Double
