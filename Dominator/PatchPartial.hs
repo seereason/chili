@@ -246,7 +246,7 @@ getNodes isProtected currNode vdom nodeIndices = do
                   | otherwise ->
                      return []
       -- For protected nodes, do everything as for a normal element, just make it look as if there are no children.
-      getNodes' currNode vdom@(Element _tag _key _attrs children) (i:is'') | isProtected vdom =
+      getNodes' currNode vdom@(Element _tag _key _attrs children) (is'') | isProtected vdom =
           do liftIO $ debugStrLn $ "getNodes _tag = " ++ show _tag ++ " is'' = " ++ show is''
              let count = descendants children
              index <- get
