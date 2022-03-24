@@ -52,14 +52,6 @@ updateView (DHandle root vdom doc) newHtml =
      putMVar vdom newHtml
      pure ()
 
-updateViewP :: Debug => (Html -> Bool) -> DHandle -> Html -> IO ()
-updateViewP isProtected (DHandle root vdom doc) newHtml =
-  do oldHtml <- takeMVar vdom
-     let patches = diff isProtected oldHtml (Just newHtml)
-     apply doc (toJSNode root) oldHtml patches
-     putMVar vdom newHtml
-     pure ()
-
 apply :: Debug => JSDocument -> JSNode -> Html -> Map Int [Patch] -> IO ()
 apply document rootNode vdom patches =
   do let indices = Map.keys patches
