@@ -18,6 +18,7 @@ import Chili.TDVar (TDVar, isDirtyTDVar, cleanTDVar)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TMVar (TMVar, putTMVar, takeTMVar)
 import Data.Aeson (FromJSON, ToJSON, decodeStrict, encode)
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as C
 import Data.Char as Char (toLower)
 import Data.Maybe (fromJust, fromMaybe, catMaybes)
@@ -29,9 +30,10 @@ import qualified Data.JSString as JS
 import Data.JSString.Text (textToJSString, textFromJSString)
 import qualified Data.Text as Text
 -- import GHCJS.Prim (ToJSString(..), FromJSString(..))
--- import JavaScript.TypedArray.ArrayBuffer (ArrayBuffer)
+import qualified JavaScript.TypedArray.ArrayBuffer as ArrayBuffer
+import JavaScript.TypedArray.ArrayBuffer (ArrayBuffer, MutableArrayBuffer)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
-import GHCJS.Buffer
+import GHCJS.Buffer as Buffer
 import GHCJS.Foreign (jsNull)
 import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
 import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
@@ -1374,15 +1376,32 @@ class IsEvent ev where
   eventToJSString :: ev -> JSString
 
 data Event
-  = LanguageChange
+  = Change
+  | Invalid
+  | LanguageChange
   | Open
   | ReadyStateChange
+  | Reset
+  | Submit
   deriving (Eq, Show, Read)
 
+instance IsEvent Event where
+  eventToJSString Change            = JS.pack "change"
+  eventToJSString Invalid           = JS.pack "invalid"
+  eventToJSString LanguageChange    = JS.pack "languagechange"
+  eventToJSString Open              = JS.pack "open"
+  eventToJSString ReadyStateChange  = JS.pack "readystatechange"
+  eventToJSString Reset             = JS.pack "reset"
+  eventToJSString Submit            = JS.pack "submit"
+
+
+type instance UniqEventName Change           = "change"
+type instance UniqEventName Invalid          = "invalid"
 type instance UniqEventName LanguageChange   = "languagechange"
 type instance UniqEventName Open             = "open"
 type instance UniqEventName ReadyStateChange = "readystatechange"
-
+type instance UniqEventName Reset            = "reset"
+type instance UniqEventName Submit           = "submit"
 
 data MouseEvent
   = AuxClick
@@ -1667,10 +1686,10 @@ foreign import javascript unsafe "$r = $1[\"inputType\"]" inputType ::
 
 foreign import javascript unsafe "$r = $1[\"isComposing\"]" isComposing ::
         InputEventObject ev -> Bool
+{-
+-- * FormDataEvent
 
--- * FormEvent
-
-data FormEvent
+data FormDataEvent
   = Change
   | Invalid
   | Reset
@@ -1692,7 +1711,7 @@ type instance UniqEventName Change  = "change"
 type instance UniqEventName Invalid = "invalid"
 type instance UniqEventName Reset   = "reset"
 type instance UniqEventName Submit  = "submit"
-
+-}
 -- * MediaEvent
 
 data MediaEvent
@@ -1938,6 +1957,8 @@ instance FromJSVal (EventObject ev) where
 instance IsEventObject (EventObject ev) where
   type Ev (EventObject ev) = ev
   asEventObject (EventObject jsval) = EventObject jsval
+
+-- * methods
 
 foreign import javascript unsafe "$1[\"defaultPrevented\"]" js_defaultPrevented ::
         EventObject ev -> IO Bool
@@ -2198,7 +2219,7 @@ type family EventObjectOf (event :: k) :: o where
   EventObject (ev :: CloseEvent)            = CloseEventObject ev
   EventObject (ev :: DragEvent)             = DragEventObject ev
   EventObject (ev :: FocusEvent)            = FocusEventObject ev
-  EventObject (ev :: FormEvent)             = EventObject ev
+--  EventObject (ev :: FormEvent)             = EventObject ev
   EventObject (ev :: HashChangeEvent)       = HashChangeEventObject ev
   EventObject (ev :: InputEvent)            = InputEventObject ev
   EventObject (ev :: KeyboardEvent)         = KeyboardEventObject ev
@@ -2358,6 +2379,20 @@ foreign import javascript unsafe "$r = $1[\"offsetWidth\"]" js_offsetWidth ::
 offsetWidth :: (MonadIO m) => JSElement -> m Int
 offsetWidth = liftIO . js_offsetWidth
 
+-- * ArrayBuffer <=> ByteString
+
+foreign import javascript unsafe "$3.slice($1, $1 + $2)"
+  js_bufferSlice :: Int -> Int -> ArrayBuffer -> ArrayBuffer
+
+byteStringToArrayBuffer :: BS.ByteString -> ArrayBuffer
+byteStringToArrayBuffer bs =
+  let (buffer, offset, len) = Buffer.fromByteString bs
+  in js_bufferSlice offset len $ Buffer.getArrayBuffer buffer
+
+byteStringFromArrayBuffer :: ArrayBuffer -> BS.ByteString
+byteStringFromArrayBuffer =
+  Buffer.toByteString 0 Nothing . Buffer.createFromArrayBuffer
+  
 -- * XMLHttpRequest
 newtype XMLHttpRequest = XMLHttpRequest { unXMLHttpRequest :: JSVal }
 
@@ -2440,13 +2475,15 @@ sendString self str =
     liftIO $ js_sendString self str >> return () -- >>= throwXHRError
 
 foreign import javascript unsafe "$1[\"send\"]($2)" js_sendArrayBuffer ::
-        XMLHttpRequest -> JSVal -> IO ()
+        XMLHttpRequest -> ArrayBuffer -> IO ()
 
-sendArrayBuffer :: (MonadIO m) => XMLHttpRequest -> Buffer -> m ()
+sendArrayBuffer :: (MonadIO m) => XMLHttpRequest -> ArrayBuffer -> m ()
 sendArrayBuffer xhr buf =
-    liftIO $ do ref <- fmap (pToJSVal . getArrayBuffer) (thaw buf)
+  liftIO $ js_sendArrayBuffer xhr buf
+{-
+    liftIO $ do ref <- fmap (pToJSVal . getArrayBuffer) (ArrayBuffer.thaw buf)
                 js_sendArrayBuffer xhr ref
-
+-}
 foreign import javascript unsafe "$1[\"send\"]($2)" js_sendData ::
         XMLHttpRequest
     -> JSVal
@@ -2470,7 +2507,6 @@ getResponseType ::
 getResponseType self
   = liftIO (textFromJSString <$> js_getResponseType self)
 
-
 foreign import javascript unsafe "$1[\"responseType\"] = $2"
         js_setResponseType ::
         XMLHttpRequest -> JSString -> IO () -- XMLHttpRequestResponseType
@@ -2483,7 +2519,7 @@ setResponseType self typ =
     liftIO $ js_setResponseType self (textToJSString typ)
 
 data XMLHttpRequestResponseType = XMLHttpRequestResponseType
-                                | XMLHttpRequestResponseTypeArraybuffer
+                                | XMLHttpRequestResponseTypeArrayBuffer
                                 | XMLHttpRequestResponseTypeBlob
                                 | XMLHttpRequestResponseTypeDocument
                                 | XMLHttpRequestResponseTypeJson
@@ -2515,7 +2551,7 @@ foreign import javascript unsafe "\"text\""
 instance ToJSVal XMLHttpRequestResponseType where
         toJSVal XMLHttpRequestResponseType
           = return js_XMLHttpRequestResponseType
-        toJSVal XMLHttpRequestResponseTypeArraybuffer
+        toJSVal XMLHttpRequestResponseTypeArrayBuffer
           = return js_XMLHttpRequestResponseTypeArraybuffer
         toJSVal XMLHttpRequestResponseTypeBlob
           = return js_XMLHttpRequestResponseTypeBlob
@@ -2532,7 +2568,7 @@ instance FromJSVal XMLHttpRequestResponseType where
             | x == js_XMLHttpRequestResponseType =
                 return (Just XMLHttpRequestResponseType)
             | x == js_XMLHttpRequestResponseTypeArraybuffer =
-                return (Just XMLHttpRequestResponseTypeArraybuffer)
+                return (Just XMLHttpRequestResponseTypeArrayBuffer)
             | x == js_XMLHttpRequestResponseTypeBlob =
                 return (Just XMLHttpRequestResponseTypeBlob)
             | x == js_XMLHttpRequestResponseTypeDocument =
@@ -2563,6 +2599,18 @@ getResponseText ::
 getResponseText self
   = liftIO
       (textFromJSString <$> js_getResponseText self)
+
+-- | <https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest.responseText Mozilla XMLHttpRequest.responseText documentation>
+getResponseByteString ::
+                (MonadIO m) => XMLHttpRequest -> m (Maybe BS.ByteString)
+getResponseByteString self
+  = liftIO $ do
+     rt <- getResponseType self
+     if rt == "arraybuffer"
+       then do r <- js_getResponse self
+               ab <- ArrayBuffer.freeze ((pFromJSVal r) :: MutableArrayBuffer)
+               pure $ Just $ byteStringFromArrayBuffer ab
+       else do pure Nothing
 
 foreign import javascript unsafe "$1[\"status\"]" js_getStatus ::
         XMLHttpRequest -> IO Word
