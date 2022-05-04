@@ -2213,34 +2213,34 @@ instance FromJSVal (ProgressEventObject ev) where
 -- * EventObjectOf
 
 type family EventObjectOf (event :: k) :: o where
-  EventObject (ev :: Event)                 = EventObject ev
-  EventObject (ev :: AnimationEvent)        = AnimationEventObject ev
-  EventObject (ev :: ClipboardEvent)        = ClipboardEventObject ev
-  EventObject (ev :: CloseEvent)            = CloseEventObject ev
-  EventObject (ev :: DragEvent)             = DragEventObject ev
-  EventObject (ev :: FocusEvent)            = FocusEventObject ev
+  EventObjectOf (ev :: Event)                 = EventObject ev
+  EventObjectOf (ev :: AnimationEvent)        = AnimationEventObject ev
+  EventObjectOf (ev :: ClipboardEvent)        = ClipboardEventObject ev
+  EventObjectOf (ev :: CloseEvent)            = CloseEventObject ev
+  EventObjectOf (ev :: DragEvent)             = DragEventObject ev
+  EventObjectOf (ev :: FocusEvent)            = FocusEventObject ev
 --  EventObject (ev :: FormEvent)             = EventObject ev
-  EventObject (ev :: HashChangeEvent)       = HashChangeEventObject ev
-  EventObject (ev :: InputEvent)            = InputEventObject ev
-  EventObject (ev :: KeyboardEvent)         = KeyboardEventObject ev
-  EventObject (ev :: MediaEvent)            = EventObject ev
-  EventObject (ev :: MessageEvent)          = MessageEventObject ev
-  EventObject (ev :: MouseEvent)            = MouseEventObject ev
-  EventObject (ev :: NetworkEvent)          = EventObject ev
-  EventObject (ev :: PageTransitionEvent)   = PageTransitionEventObject ev
-  EventObject (ev :: PopStateEvent)         = PopStateEventObject ev
-  EventObject (ev :: PrintingEvent)         = EventObject ev
-  EventObject (ev :: ProgressEvent)         = ProgressEventObject ev
-  EventObject (ev :: PromiseRejectionEvent) = PromiseRejectionEventObject ev
-  EventObject (ev :: ResourceEvent)         = EventObject ev
-  EventObject (ev :: SelectionEvent)        = EventObject ev
-  EventObject (ev :: StorageEvent)          = StorageEventObject ev
-  EventObject (ev :: TouchEvent)            = TouchEventObject ev
-  EventObject (ev :: TransitionEvent)       = TransitionEventObject ev
-  EventObject (ev :: ViewEvent)             = EventObject ev
-  EventObject (ev :: VDOMEvent)             = VDOMEventObject ev
-  EventObject (ev :: WheelEvent)            = WheelEventObject ev
-  EventObject e                             = CustomEventObject e (CustomEventDetail e)
+  EventObjectOf (ev :: HashChangeEvent)       = HashChangeEventObject ev
+  EventObjectOf (ev :: InputEvent)            = InputEventObject ev
+  EventObjectOf (ev :: KeyboardEvent)         = KeyboardEventObject ev
+  EventObjectOf (ev :: MediaEvent)            = EventObject ev
+  EventObjectOf (ev :: MessageEvent)          = MessageEventObject ev
+  EventObjectOf (ev :: MouseEvent)            = MouseEventObject ev
+  EventObjectOf (ev :: NetworkEvent)          = EventObject ev
+  EventObjectOf (ev :: PageTransitionEvent)   = PageTransitionEventObject ev
+  EventObjectOf (ev :: PopStateEvent)         = PopStateEventObject ev
+  EventObjectOf (ev :: PrintingEvent)         = EventObject ev
+  EventObjectOf (ev :: ProgressEvent)         = ProgressEventObject ev
+  EventObjectOf (ev :: PromiseRejectionEvent) = PromiseRejectionEventObject ev
+  EventObjectOf (ev :: ResourceEvent)         = EventObject ev
+  EventObjectOf (ev :: SelectionEvent)        = EventObject ev
+  EventObjectOf (ev :: StorageEvent)          = StorageEventObject ev
+  EventObjectOf (ev :: TouchEvent)            = TouchEventObject ev
+  EventObjectOf (ev :: TransitionEvent)       = TransitionEventObject ev
+  EventObjectOf (ev :: ViewEvent)             = EventObject ev
+  EventObjectOf (ev :: VDOMEvent)             = VDOMEventObject ev
+  EventObjectOf (ev :: WheelEvent)            = WheelEventObject ev
+  EventObjectOf e                             = CustomEventObject e (CustomEventDetail e)
 
 -- * CustomEvent
 
