@@ -18,6 +18,7 @@ import Chili.TDVar (TDVar, isDirtyTDVar, cleanTDVar)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TMVar (TMVar, putTMVar, takeTMVar)
 import Data.Aeson (FromJSON, ToJSON, decodeStrict, encode)
+import Data.Bits ((.&.))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as C
 import Data.Char as Char (toLower)
@@ -209,15 +210,21 @@ instance FromJSVal JSNodeList where
 instance IsJSNode JSNodeList where
     toJSNode = JSNode . unJSNodeList
 
+foreign import javascript unsafe "$1[\"length\"]" js_nodeListLength ::
+        JSNodeList -> IO Int
+
+nodeListLength :: (MonadIO m) => JSNodeList -> m Int
+nodeListLength nodeList = liftIO $ js_nodeListLength nodeList
+
 foreign import javascript unsafe "$1[\"item\"]($2)" js_item ::
-        JSNodeList -> Word -> IO JSNode
+        JSNodeList -> Word -> IO JSVal
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/NodeList.item Mozilla NodeList.item documentation>
 item ::
      (MonadIO m) => JSNodeList -> Word -> m (Maybe JSNode)
 item self index
   = liftIO
-      ((js_item (self) index) >>= return . Just)
+      ((js_item (self) index) >>= fromJSVal)
 
 foreign import javascript unsafe "$1[\"length\"]" js_length ::
         JSNode -> IO Word
@@ -243,6 +250,33 @@ foreign import javascript unsafe "$r = $1[\"contentEditable\"]"
 
 getContentEditable :: (MonadIO m) => JSElement -> m Bool
 getContentEditable e = liftIO $ js_getContentEditable e
+
+data DocumentPosition = DocumentPosition
+  { dpDisconnected :: Bool
+  , dpPreceding    :: Bool
+  , dpFollowing    :: Bool
+  , dpContains     :: Bool
+  , dpContainedBy  :: Bool
+  , dpImplementationSpecific :: Bool
+  }
+  deriving (Eq, Ord, Read, Show)
+
+maskToDocumentPosition :: Int -> DocumentPosition
+maskToDocumentPosition m = DocumentPosition
+  { dpDisconnected = (m .&. 1) == 1
+  , dpPreceding    = (m .&. 2) == 2
+  , dpFollowing    = (m .&. 4) == 4
+  , dpContains     = (m .&. 8) == 8
+  , dpContainedBy  = (m .&. 16) == 16
+  , dpImplementationSpecific = (m .&. 32) == 32
+  }
+
+foreign import javascript unsafe "$1[\"compareDocumentPosition\"]($2)"
+   js_compareDocumentPosition :: JSNode -> JSNode -> IO Int
+
+compareDocumentPosition :: (IsJSNode node, IsJSNode otherNode, MonadIO m) => node -> otherNode -> m DocumentPosition
+compareDocumentPosition node otherNode =
+  liftIO $ maskToDocumentPosition <$> js_compareDocumentPosition (toJSNode node) (toJSNode otherNode)
 
 foreign import javascript unsafe "$1[\"contains\"]($2)"
    js_contains :: JSNode -> JSNode -> IO Bool
