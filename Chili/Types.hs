@@ -3272,6 +3272,12 @@ newtype VDOMEventObject ev = VDOMEventObject { unVDOMEventObject :: JSVal }
 instance MkEvent Redrawn where
   mkEvent _ jsval = VDOMEventObject jsval
 
+instance MkEvent Change where
+  mkEvent _ jsval = EventObject jsval
+
+instance MkEvent Input where
+  mkEvent _ jsval = InputEventObject jsval
+
 instance Show (VDOMEventObject ev) where
   show _ = "VDOMEventObject"
 
