@@ -345,6 +345,7 @@ selectorName' (F p) = "f_" ++ selectorName' p
 selectorName' (N p) = "n_" ++ selectorName' p
 selectorName' (E _) = error "Dominator.DOMC.selectorName' E"
 selectorName' (D _) = error "Dominator.DOMC.selectorName' D"
+selectorName' (C _) = error "Dominator.DOMC.selectorName' C"
 
 data UpdateNode
   = UpdateAttribute String
@@ -588,6 +589,7 @@ findExpressions' p (Element tag attrs c)
        case find (\(Attr nm _) -> nm == "cond") attrs of
          Nothing -> error "<d-if> is missing the required 'cond' attribute"
          (Just (Attr _ val)) -> [(C p, ConditionalElement val)]
+         o -> error $  "findExpressions': pattern match failed to match on " ++ show o
 
    | otherwise =
        (catMaybes (map (findAttrExpr p) attrs)) ++ findExpressions (F p) c
