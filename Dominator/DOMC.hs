@@ -1,4 +1,4 @@
-{-# language QuasiQuotes, TemplateHaskell, DeriveLift, ExistentialQuantification #-}
+{-# language QuasiQuotes, TemplateHaskell, DeriveLift, ExistentialQuantification, TypeApplications #-}
 module Dominator.DOMC where
 {-
 
@@ -95,7 +95,7 @@ HTML 5 has a built-in concept of templates. Can we use those to avoid having to 
 -}
 
 import Control.Monad.Trans (liftIO)
-import Chili.Types (removeAttribute, setStyle)
+import Chili.Types (firstElementChild, fromJSNode, nextElementSibling, removeAttribute, setStyle)
 import Dominator.Types (JSDocument, JSNode, JSElement(..), appendChild, createJSElement, createJSTextNode, getFirstChild, toJSNode, nextSibling, setAttribute, setNodeValue, setProperty)
 import Control.Monad.Trans (MonadIO)
 import qualified Data.Text.Lazy as L
@@ -134,9 +134,9 @@ Inspired by DDLog (differential datalog).
 
 data Attr
   = Attr String String
-  | PropS String String
-  | PropB String Bool
-  | PropStyle String String
+  | PropS String String     -- ^ set a property to a string value
+  | PropB String Bool       -- ^ set a property to a bool value
+  | PropStyle String String -- ^ set the style property
   deriving (Eq, Ord, Show, Lift)
 
 data Html
@@ -148,6 +148,7 @@ data Html
 data SpliceType
   = Str String
 --  | Html
+  | ConditionalElement String
   | CustomElement String [Attr]
   | AttrList String
   deriving (Eq, Ord, Show, Lift)
@@ -156,6 +157,7 @@ data SpliceVal
   = StrV      { unStrV      :: String }
   | AttrListV { unAttrListV :: [Attr] }
   | forall a. (Show a, Typeable a) => CustomElementV (Dynamic -> (a -> IO ())) (JSDocument -> IO (JSNode, a -> IO ())) [a]
+  | BoolV     { unBoolV     :: Bool  }
 --  deriving (Eq, Ord, Show, Lift)
 
 domc :: QuasiQuoter
@@ -215,8 +217,8 @@ renderHtml doc (Element tag attrs children) =
       doAttr elem (Attr k v)
          | k == "expr" = pure ()
          | otherwise   = setAttribute elem (Text.pack k) (Text.pack v)
-      doAttr elem (PropS k v)   = setProperty elem (Text.pack k) (Text.pack v)
-      doAttr elem (PropB k v)   = setProperty elem (Text.pack k) v
+      doAttr elem (PropS k v)     = setProperty elem (Text.pack k) (Text.pack v)
+      doAttr elem (PropB k v)     = setProperty elem (Text.pack k) v
       doAttr elem (PropStyle k v) = setStyle elem (JS.pack k) (JS.pack v)
 --      doAttr elem (OnCreate f) = liftIO $ do cb <- asyncCallback $ f elem model
 --                                             js_setTimeout cb 0
@@ -289,6 +291,10 @@ pExp (path, spliceType) =
       case parseExp s of
         (Left e)  -> error (s ++ "\n" ++  e)
         (Right e) -> (path, [| AttrListV $(pure e) |])
+    ConditionalElement s ->
+      case parseExp s of
+        (Left e) -> error (s ++ "\n" ++ e)
+        (Right e) -> (path, [| BoolV $(pure e) |])
     CustomElement fnStr attrs ->
       let dMap = find (\a -> case a of
                              (Attr "d-map" asStr) -> True
@@ -344,6 +350,7 @@ data UpdateNode
   = UpdateAttribute String
   | UpdateDynamic (IORef [(JSNode, Dynamic)])
   | UpdateNodeValue (IORef ())
+  | UpdateConditionalNode (IORef (JSElement, JSElement))
   | AppendAttributes
 
 -- | The path is inside out -- the Start node is at the end.
@@ -357,6 +364,12 @@ mkSelector n (D p) = do
   do (kind, n') <- mkSelector n p
      ioRef <- newIORef []
      pure (UpdateDynamic ioRef, n')
+mkSelector n (C p) = do
+  do (kind, n') <- mkSelector n p
+     (Just t) <- firstElementChild (fromJust (fromJSNode @JSElement n'))
+     (Just f) <- nextElementSibling (toJSNode t)
+     ioRef <- newIORef (t, f)
+     pure (UpdateConditionalNode ioRef, n')
 mkSelector n (A name p) = do
   do (kind, n') <- mkSelector n p
      pure (UpdateAttribute name, n')
@@ -444,6 +457,15 @@ mkUpdater html =
                                                               (StrV s) ->
                                                                 setNodeValue n (JS.pack s)
 --                                                                e `seq` setNodeValue n (JS.pack $ unStrV e)
+                                                       UpdateConditionalNode ioRef ->
+                                                         case e of
+                                                           (BoolV b) ->
+                                                             do (t,f) <- readIORef ioRef
+                                                                removeChildren n
+                                                                if b
+                                                                  then appendChild n t
+                                                                  else appendChild n f
+                                                                pure ()
                                                        UpdateDynamic ioRef ->
                                                          case e of
                                                            (CustomElementV fromD f as) ->
@@ -541,6 +563,7 @@ data Path
   | E Path -- ^ expression which returns a list of attributes to add (how do you remove them?)
 --   | H [Html] -- ^ expression which expands to a list of nodes
   | D Path -- ^ dynamic. path will point to the parent element.
+  | C Path -- ^ conditional element. path will point to the parent element.
   | Start -- ^ top-level
     deriving (Eq, Ord, Show, Lift)
 
@@ -561,7 +584,13 @@ findExpressions' p Noop = []
 findExpressions' (F p) (Element tag attrs c) -- first child is a custom element
    | isPrefixOf "f-" tag = [(D p, CustomElement tag attrs)]
 findExpressions' p (Element tag attrs c)
-   | otherwise = (catMaybes (map (findAttrExpr p) attrs)) ++ findExpressions (F p) c
+   | ("d-if" `isPrefixOf` tag) =
+       case find (\(Attr nm _) -> nm == "cond") attrs of
+         Nothing -> error "<d-if> is missing the required 'cond' attribute"
+         (Just (Attr _ val)) -> [(C p, ConditionalElement val)]
+
+   | otherwise =
+       (catMaybes (map (findAttrExpr p) attrs)) ++ findExpressions (F p) c
 findExpressions' p (CData str) =
   case str of
 --    '{':'{':'>':rest ->
@@ -570,9 +599,9 @@ findExpressions' p (CData str) =
       [(p, Str $ reverse $ drop 2 $ reverse $ rest )]
     _ -> []
 
-
 -- FIXME: allow expressions to be less than the entire attribute value
 findAttrExpr :: Path -> Attr -> Maybe (Path, SpliceType)
+-- findAttrExpr p (Attr "d-if" val) = Just (D p, ConditionalElement val)
 findAttrExpr p (Attr name val) =
   case val of
     '{':'{':rest ->

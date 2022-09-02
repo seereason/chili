@@ -1,3 +1,4 @@
+{-# language DataKinds #-}
 {-# language QuasiQuotes, TemplateHaskell #-}
 {-# language OverloadedStrings #-}
 {-# language TypeApplications #-}
@@ -7,7 +8,7 @@ import Control.Monad.Trans (MonadIO)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
 import Control.Concurrent.STM (atomically)
-import Chili.Types (unJSNode, getFirstChild, replaceChild, remove)
+import Chili.Types (unJSNode, getFirstChild, replaceChild, replaceWith, remove, removeChildren, ev)
 import Data.Char (toUpper)
 import Dominator.Types (JSDocument, JSElement, JSNode, MouseEvent(..), MouseEventObject(..), addEventListener, fromEventTarget, getAttribute, toJSNode, appendChild, currentDocument, removeChildren, target)
 import Dominator.DOMC
@@ -46,9 +47,14 @@ template =
            <ol>
              <f-list-item d-map="myList model"></f-list-item>
            </ol>
+           <d-if cond="clickCount model > 10">
+            <p>click count is greater than 10</p>
+            <p>click count is less than or equal to 10</p>
+          </d-if>
          </body>
         </html>
       |]
+--
 {-
 template2 :: JSDocument -> JSNode -> IO (JSNode, Model -> IO ())
 template2 =
@@ -80,14 +86,17 @@ main =
      (newNode, update) <- template d -- (toJSNode d)
 --     update <- mkUpdate newNode
 
-     (Just rootNode) <- getFirstChild (toJSNode d)
-     replaceChild (toJSNode d) newNode rootNode
+--     (Just rootNode) <- getFirstChild (toJSNode d)
+--     replaceChild (toJSNode d) newNode rootNode
+     removeChildren (toJSNode d)
+     appendChild (toJSNode d) newNode
+--     replaceWith rootNode newNode
 
      update =<< (atomically $ readTVar model)
-     addEventListener d Click (clickHandler update model) False
+     addEventListener d (ev @Click) (clickHandler update model) False
      pure ()
 
-clickHandler :: (Model -> IO ()) -> TVar Model -> MouseEventObject -> IO ()
+clickHandler :: (Model -> IO ()) -> TVar Model -> MouseEventObject Click -> IO ()
 clickHandler update model e =
   do let (Just elem) = fromEventTarget @JSElement (target e)
      mId <- getAttribute elem "id"
