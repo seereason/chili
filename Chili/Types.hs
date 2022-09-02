@@ -1936,6 +1936,32 @@ instance IsEventObject (StorageEventObject ev) where
   type Ev (StorageEventObject ev) = ev
   asEventObject (StorageEventObject jsval) = EventObject jsval
 
+
+foreign import javascript unsafe "$r = $1[\"key\"]" js_key ::
+  StorageEventObject ev -> Nullable JSString
+
+key :: StorageEventObject ev -> Maybe JSString
+key e = nullableToMaybe (js_key e)
+
+foreign import javascript unsafe "$r = $1[\"newValue\"]" js_newValue ::
+  StorageEventObject ev -> Nullable JSString
+
+newValue :: StorageEventObject ev -> Maybe JSString
+newValue e = nullableToMaybe (js_newValue e)
+
+foreign import javascript unsafe "$r = $1[\"oldValue\"]" js_oldValue ::
+  StorageEventObject ev -> Nullable JSString
+
+oldValue :: StorageEventObject ev -> Maybe JSString
+oldValue e = nullableToMaybe (js_oldValue e)
+
+foreign import javascript unsafe "$r = $1[\"url\"]" js_url ::
+  StorageEventObject ev -> JSString
+
+url :: StorageEventObject ev -> JSString
+url e = js_url e
+
+
 -- * WheelEvent
 
 data WheelEvent
@@ -2426,7 +2452,7 @@ byteStringToArrayBuffer bs =
 byteStringFromArrayBuffer :: ArrayBuffer -> BS.ByteString
 byteStringFromArrayBuffer =
   Buffer.toByteString 0 Nothing . Buffer.createFromArrayBuffer
-  
+
 -- * XMLHttpRequest
 newtype XMLHttpRequest = XMLHttpRequest { unXMLHttpRequest :: JSVal }
 
@@ -2678,7 +2704,7 @@ sendRemoteWS ws remote =
 
 initRemoteWS :: (ToJSON remote) => JS.JSString -> (MessageEvent.MessageEvent -> IO ()) -> IO (remote -> IO ())
 initRemoteWS url' onMessageHandler =
-    do let request = WebSocketRequest { url       = url'
+    do let request = WebSocketRequest { JavaScript.Web.WebSocket.url       = url'
                                       , protocols = []
                                       , onClose   = Nothing
                                       , onMessage = Just onMessageHandler
