@@ -458,6 +458,7 @@ mkUpdater html =
                                                               (StrV s) ->
                                                                 setNodeValue n (JS.pack s)
 --                                                                e `seq` setNodeValue n (JS.pack $ unStrV e)
+                                                              _ -> error $  "Expected StrV but got something else."
                                                        UpdateConditionalNode ioRef ->
                                                          case e of
                                                            (BoolV b) ->
@@ -467,6 +468,7 @@ mkUpdater html =
                                                                   then appendChild n t
                                                                   else appendChild n f
                                                                 pure ()
+                                                           _ -> error $  "Expected BoolV but got something else."
                                                        UpdateDynamic ioRef ->
                                                          case e of
                                                            (CustomElementV fromD f as) ->
@@ -507,6 +509,7 @@ mkUpdater html =
                                                                    pure ()
 
 --                                                                setNodeValue n (head $ f a)
+                                                           _ -> error $  "Expected CustomElementV but got something else."
 
                                                        UpdateAttribute nm ->
                                                          do -- set attribute and property?
@@ -588,7 +591,7 @@ findExpressions' p (Element tag attrs c)
    | ("d-if" `isPrefixOf` tag) =
        case find (\(Attr nm _) -> nm == "cond") attrs of
          Nothing -> error "<d-if> is missing the required 'cond' attribute"
-         (Just (Attr _ val)) -> [(C p, ConditionalElement val)]
+         (Just (Attr _ val)) -> ((C p, ConditionalElement val)) : (findExpressions (F p) c)
          o -> error $  "findExpressions': pattern match failed to match on " ++ show o
 
    | otherwise =
