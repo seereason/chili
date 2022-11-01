@@ -464,15 +464,14 @@ foreign import javascript unsafe "$r = $1[\"document\"]"
 document :: (MonadIO m) => JSWindow -> m (Maybe JSDocument)
 document w = liftIO $ fromJSVal =<< js_document w
 
-foreign import javascript unsafe "$r = $1[\"querySelector\"]"
-        js_querySelector :: JSDocument -> JSString -> IO JSVal
+foreign import javascript unsafe "$r = $1[\"querySelector\"]($2)"
+        js_querySelector :: JSVal -> JSString -> IO (Nullable JSElement)
 
-querySelector :: (MonadIO m) => JSDocument -> JSString -> m (Maybe JSElement)
-querySelector d sel = liftIO $ fromJSVal =<< js_querySelector d sel
+querySelector :: (MonadIO m, IsParentNode obj, PToJSVal obj) => obj -> JSString -> m (Maybe JSElement)
+querySelector o sel = liftIO (nullableToMaybe <$> js_querySelector (pToJSVal o) sel)
 
 foreign import javascript unsafe "$r = $1[\"body\"]"
         js_body :: JSDocument -> IO JSVal
-
 
 body :: (MonadIO m) => JSDocument -> m (Maybe JSElement)
 body d = liftIO $ fromJSVal =<< js_body d
@@ -1437,6 +1436,8 @@ type instance UniqEventName ReadyStateChange = "readystatechange"
 type instance UniqEventName Reset            = "reset"
 type instance UniqEventName Submit           = "submit"
 
+-- * MouseEvent
+
 data MouseEvent
   = AuxClick
   | Click
@@ -1475,6 +1476,32 @@ instance IsEvent MouseEvent where
   eventToJSString MouseOver   = JS.pack "mouseover"
   eventToJSString MouseOut    = JS.pack "mouseout"
   eventToJSString MouseUp     = JS.pack "mouseup"
+
+-- * PointerEvent
+
+data PointerEvent
+  = PointerDown
+  | PointerUp
+  | PointerMove
+  | PointerOver
+  | PointerOut
+  | PointerEnter
+  | PointerLeave
+  | PointerCancel
+  | GotPointerCapture
+  | LostPointerCapture
+    deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+type instance UniqEventName PointerDown        = "pointerdown"
+type instance UniqEventName PointerUp          = "pointerup"
+type instance UniqEventName PointerMove        = "pointermove"
+type instance UniqEventName PointerOver        = "pointerover"
+type instance UniqEventName PointerOut         = "pointerout"
+type instance UniqEventName PointerEnter       = "pointerenter"
+type instance UniqEventName PointerLeave       = "pointerleave"
+type instance UniqEventName PointerCancel      = "pointercancel"
+type instance UniqEventName GotPointerCapture  = "gotpointercapture"
+type instance UniqEventName LostPointerCapture = "lostpointercapture"
 
 -- * HashChangeEvent
 
@@ -1708,12 +1735,6 @@ foreign import javascript unsafe "$r = $1[\"data\"]" js_inputData ::
 
 inputData :: InputEventObject ev -> Maybe JSString
 inputData ev = nullableToMaybe (js_inputData ev)
-
-foreign import javascript unsafe "$r = $1[\"dataTransfer\"]" js_dataTransfer ::
-        InputEventObject ev -> Nullable DataTransfer
-
-dataTransfer :: InputEventObject ev -> Maybe DataTransfer
-dataTransfer ev = nullableToMaybe (js_dataTransfer ev)
 
 foreign import javascript unsafe "$r = $1[\"inputType\"]" inputType ::
         InputEventObject ev -> JSString
@@ -2070,6 +2091,12 @@ instance IsEventObject (MouseEventObject ev) where
   type Ev (MouseEventObject ev) = ev
   asEventObject (MouseEventObject jsval) = EventObject jsval
 
+class IsMouseEventObject obj where
+  asMouseEventObject :: obj -> MouseEventObject ev
+
+instance IsMouseEventObject (MouseEventObject ev) where
+  asMouseEventObject (MouseEventObject jsval) = (MouseEventObject jsval)
+
 foreign import javascript unsafe "$1[\"clientX\"]" clientX ::
         MouseEventObject ev -> Double
 
@@ -2096,6 +2123,29 @@ instance HasModifierKeys (MouseEventObject ev) where
   ctrlKey  = mouse_ctrlKey
   altKey   = mouse_altKey
   metaKey  = mouse_metaKey
+
+-- * PointerEventObject
+
+newtype PointerEventObject (ev :: PointerEvent) = PointerEventObject { unPointerEventObject :: JSVal }
+
+instance Show (PointerEventObject ev) where
+  show _ = "PointerEventObject"
+
+instance ToJSVal (PointerEventObject ev) where
+  toJSVal = return . unPointerEventObject
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal (PointerEventObject ev) where
+  fromJSVal = return . fmap PointerEventObject . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance IsEventObject (PointerEventObject ev) where
+  type Ev (PointerEventObject ev) = ev
+  asEventObject (PointerEventObject jsval) = EventObject jsval
+
+instance IsMouseEventObject (PointerEventObject ev) where
+  asMouseEventObject (PointerEventObject jsval) = (MouseEventObject jsval)
+
 
 -- * KeyboardEvent
 
@@ -2288,6 +2338,7 @@ type family EventObjectOf (event :: k) :: o where
   EventObjectOf (ev :: MouseEvent)            = MouseEventObject ev
   EventObjectOf (ev :: NetworkEvent)          = EventObject ev
   EventObjectOf (ev :: PageTransitionEvent)   = PageTransitionEventObject ev
+  EventObjectOf (ev :: PointerEvent)          = PointerEventObject ev
   EventObjectOf (ev :: PopStateEvent)         = PopStateEventObject ev
   EventObjectOf (ev :: PrintingEvent)         = EventObject ev
   EventObjectOf (ev :: ProgressEvent)         = ProgressEventObject ev
@@ -2759,6 +2810,15 @@ instance FromJSVal (DragEventObject ev) where
 instance IsEventObject (DragEventObject ev) where
   type Ev (DragEventObject ev) = ev
   asEventObject (DragEventObject jsval) = EventObject jsval
+
+instance IsMouseEventObject (DragEventObject ev) where
+  asMouseEventObject (DragEventObject jsval) = (MouseEventObject jsval)
+
+foreign import javascript unsafe "$r = $1[\"dataTransfer\"]" js_dataTransfer ::
+        DragEventObject ev -> Nullable DataTransfer
+
+dataTransfer :: DragEventObject ev -> Maybe DataTransfer
+dataTransfer ev = nullableToMaybe (js_dataTransfer ev)
 
 -- * Selection
 
