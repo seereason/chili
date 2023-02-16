@@ -2282,6 +2282,12 @@ instance IsEventObject (FocusEventObject ev) where
   type Ev (FocusEventObject ev) = ev
   asEventObject (FocusEventObject jsval) = EventObject jsval
 
+foreign import javascript unsafe "$1[\"relatedTarget\"]" js_relatedTarget ::
+        FocusEventObject ev -> Nullable JSElement
+
+relatedTarget :: FocusEventObject ev -> Maybe JSElement
+relatedTarget = nullableToMaybe . js_relatedTarget
+
 -- * ProgressEvent
 
 -- | note: "abort", "load", and "error" can sometimes return a 'ProgressEventObject'
