@@ -48,8 +48,8 @@ template =
              <f-list-item d-map="myList model"></f-list-item>
            </ol>
            <d-if cond="clickCount model > 10">
-            <p>click count is greater than 10</p>
-            <p>click count is less than or equal to 10</p>
+            <p><span>click count is greater than 10. In fact it is </span><span>{{ show $ clickCount model }}</span></p>
+            <p><span>click count is less than or equal to 10. In fact it is only </span><span>{{ show $ clickCount model }}</span></p>
           </d-if>
          </body>
         </html>
