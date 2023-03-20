@@ -147,7 +147,7 @@ data Html
 
 data SpliceType
   = Str String
---  | Html
+  | Htmls String
   | ConditionalElement String
   | CustomElement String [Attr]
   | AttrList String
@@ -155,6 +155,7 @@ data SpliceType
 
 data SpliceVal
   = StrV      { unStrV      :: String }
+  | HtmlsV    { unHTmlsV    :: IO [JSNode] }
   | AttrListV { unAttrListV :: [Attr] }
   | forall a. (Show a, Typeable a) => CustomElementV (Dynamic -> (a -> IO ())) (JSDocument -> IO (JSNode, a -> IO ())) [a]
   | BoolV     { unBoolV     :: Bool  }
@@ -287,6 +288,10 @@ pExp (path, spliceType) =
       case parseExp s of
         (Left e)  -> error (s ++ "\n" ++  e)
         (Right e) -> (path, [| StrV $(pure e) |])
+    Htmls s ->
+      case parseExp s of
+        (Left e)  -> error (s ++ "\n" ++  e)
+        (Right e) -> (path, [| HtmlsV $(pure e) |])
     AttrList s ->
       case parseExp s of
         (Left e)  -> error (s ++ "\n" ++  e)
@@ -443,6 +448,7 @@ mkUpdater html =
                    [| do -- putStrLn $ show html
                          -- putStrLn $ show allPaths
                          -- putStrLn $ "exps = " ++ show exps
+                         putStrLn $ "exps = " ++ show (exps :: [(Path, SpliceType)])
                          nodes <- mapM (mkSelector rootNode) allPaths
 
                          pure $ \model -> do -- print path
@@ -458,6 +464,18 @@ mkUpdater html =
                                                               (StrV s) ->
                                                                 setNodeValue n (JS.pack s)
 --                                                                e `seq` setNodeValue n (JS.pack $ unStrV e)
+                                                              (HtmlsV htmls) ->
+                                                                do h <- htmls
+                                                                   putStrLn $ "set htmls l = " ++ show (length h)
+                                                                   mp <- parentNode n
+                                                                   case mp of
+                                                                     Nothing -> pure ()
+                                                                     (Just p) ->
+                                                                       do setTextContent n ""
+                                                                          removeChildren p
+                                                                          mapM_ (appendChild p) h
+                                                                          -- setNodeValue n (JS.pack s)
+                                                                          pure ()
                                                               _ -> error $  "Expected StrV but got something else."
                                                        UpdateConditionalNode ioRef ->
                                                          case e of
@@ -597,9 +615,9 @@ findExpressions' p (Element tag attrs c)
    | otherwise =
        (catMaybes (map (findAttrExpr p) attrs)) ++ findExpressions (F p) c
 findExpressions' p (CData str) =
-  case str of
---    '{':'{':'>':rest ->
---      [(p, reverse $ drop 2 $ reverse $ rest, Html )]
+  case dropWhile isSpace str of
+    '{':'{':'#':rest ->
+      [(p, Htmls $ reverse $ drop 2 $ reverse $ rest )]
     '{':'{':rest ->
       [(p, Str $ reverse $ drop 2 $ reverse $ rest )]
     _ -> []
@@ -680,7 +698,7 @@ domcExpr template =
 This version attempts to replace the entire document including the <html>. But that might be leading to an error:
 
  "Node cannot be inserted at the specified point in the hierarchy"
-
+v
 It seems to work when loading an index.html from disk, but not when the index.html comes from a server.
 
 domcExpr :: String -> Q Exp
