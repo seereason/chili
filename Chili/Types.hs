@@ -1994,7 +1994,7 @@ type instance UniqEventName Wheel          = "wheel"
 -- * WheelEventObject
 
 newtype WheelEventObject (ev :: WheelEvent) = WheelEventObject { unWheelEventObject :: JSVal }
-
+ 
 instance Show (WheelEventObject ev) where
   show _ = "WheelEventObject"
 
@@ -3496,3 +3496,14 @@ foreign import javascript unsafe "$1[\"data\"]"
 -- | object.data
 getCharacterData :: (CharacterData obj) => obj -> IO JSString
 getCharacterData o = js_data (toJSNode o)
+
+
+-- * currentScript
+
+-- FIXME: could be a more specific JSHTMLScriptElement if we had bothered to create such a thing
+foreign import javascript unsafe "$r = $1[\"currentScript\"]" js_currentScript ::
+  JSDocument -> IO JSVal
+
+currentScript :: (MonadIO m) => JSDocument -> m (Maybe JSElement)
+currentScript d =
+  liftIO (fromJSVal =<< js_currentScript d)
