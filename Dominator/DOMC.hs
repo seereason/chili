@@ -448,7 +448,7 @@ mkUpdater html =
                    [| do -- putStrLn $ show html
                          -- putStrLn $ show allPaths
                          -- putStrLn $ "exps = " ++ show exps
-                         putStrLn $ "exps = " ++ show (exps :: [(Path, SpliceType)])
+                         -- putStrLn $ "exps = " ++ show (exps :: [(Path, SpliceType)])
                          nodes <- mapM (mkSelector rootNode) allPaths
 
                          pure $ \model -> do -- print path
@@ -466,7 +466,7 @@ mkUpdater html =
 --                                                                e `seq` setNodeValue n (JS.pack $ unStrV e)
                                                               (HtmlsV htmls) ->
                                                                 do h <- htmls
-                                                                   putStrLn $ "set htmls l = " ++ show (length h)
+                                                                   -- putStrLn $ "set htmls l = " ++ show (length h)
                                                                    mp <- parentNode n
                                                                    case mp of
                                                                      Nothing -> pure ()
