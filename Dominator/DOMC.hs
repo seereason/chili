@@ -96,6 +96,7 @@ HTML 5 has a built-in concept of templates. Can we use those to avoid having to 
 
 import Control.Monad.Trans (liftIO)
 import Chili.Types (firstElementChild, fromJSNode, nextElementSibling, removeAttribute, setStyle)
+import Data.CaseInsensitive (original)
 import Dominator.Types (JSDocument, JSNode, JSElement(..), appendChild, createJSElement, createJSTextNode, getFirstChild, toJSNode, nextSibling, setAttribute, setNodeValue, setProperty)
 import Control.Monad.Trans (MonadIO)
 import qualified Data.Text.Lazy as L
@@ -187,8 +188,8 @@ normalizeTree (Node token subForest) = (Node token (stripLeadingWhite subForest)
 treeToHtml :: Tree Token -> Html
 treeToHtml (Node token subForest) =
   case token of
-    (TagOpen tagName attrs)      -> Element (Text.unpack tagName) (map toAttr attrs) (forestToHtml subForest)
-    (TagSelfClose tagName attrs) -> Element (Text.unpack tagName) (map toAttr attrs) (forestToHtml subForest)
+    (TagOpen tagName attrs)      -> Element (Text.unpack (original tagName)) (map toAttr attrs) (forestToHtml subForest)
+    (TagSelfClose tagName attrs) -> Element (Text.unpack (original tagName)) (map toAttr attrs) (forestToHtml subForest)
     (ContentText txt)            -> CData (Text.unpack txt)
     _ -> error $ "Dominator.DOMC.treeToHtml does not handle " ++ show token -- Noop
   where

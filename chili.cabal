@@ -15,6 +15,7 @@ library
   build-depends:       aeson,
                        base >=4.8 && <4.17,
                        bytestring,
+                       case-insensitive,
                        containers,
                        haskell-src-meta,
                        html-parse,
