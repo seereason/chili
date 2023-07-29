@@ -2382,11 +2382,17 @@ instance IsEventObject (CustomEventObject ev detail) where
 foreign import javascript unsafe "new CustomEvent($1, { 'detail': $2, 'bubbles' : $3, 'cancelable' : $4})"
         js_newCustomEvent :: JSString -> JSVal -> Bool -> Bool -> IO JSVal
 
-newCustomEvent :: (KnownSymbol (UniqEventName ev), FromJSVal (CustomEventDetail ev), ToJSVal (CustomEventDetail ev)) => EventName ev -> Maybe (CustomEventDetail ev) -> Bool -> Bool -> IO (CustomEventObject ev detail)
-newCustomEvent ev detail bubbles cancelable =
+newCustomEventWithDetail :: (KnownSymbol (UniqEventName ev), FromJSVal (CustomEventDetail ev), ToJSVal (CustomEventDetail ev)) => EventName ev -> (CustomEventDetail ev) -> Bool -> Bool -> IO (CustomEventObject ev detail)
+newCustomEventWithDetail ev detail bubbles cancelable =
   do let evStr = JS.pack $ eventName ev
      d <- toJSVal detail
      jsval <- js_newCustomEvent evStr d bubbles cancelable
+     pure $ CustomEventObject jsval
+
+newCustomEventNoDetail :: (KnownSymbol (UniqEventName ev), (CustomEventDetail ev) ~ ()) => EventName ev -> Bool -> Bool -> IO (CustomEventObject ev detail)
+newCustomEventNoDetail ev bubbles cancelable =
+  do let evStr = JS.pack $ eventName ev
+     jsval <- js_newCustomEvent evStr jsNull bubbles cancelable
      pure $ CustomEventObject jsval
 
 foreign import javascript unsafe "$r = $1[\"detail\"]"
