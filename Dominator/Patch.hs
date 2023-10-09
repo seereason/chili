@@ -9,7 +9,7 @@ import Control.Monad (when)
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans (MonadIO(..))
 import Chili.Debug (Debug)
-import Chili.Types (JSDocument, JSElement(..), JSNode, JSNodeList, unJSNode, addEventListener, addEventListenerOpt, currentDocument, childNodes, deleteProperty, eventName, getFirstChild, getLength, item, parentNode, nodeType, item, toJSNode, removeAttribute, removeChild, replaceData, replaceChild, setAttribute, setProperty, insertBefore)
+import Chili.Types ((@@), JSDocument, JSElement(..), JSNode, JSNodeList, PatchIndexTooLarge(..), unJSNode, addEventListener, addEventListenerOpt, currentDocument, childNodes, deleteProperty, eventName, getFirstChild, getLength, item, parentNode, nodeType, item, toJSNode, removeAttribute, removeChild, replaceData, replaceChild, setAttribute, setProperty, insertBefore)
 import Data.List (sort)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -251,7 +251,7 @@ getNodes currNode vdom nodeIndices = do
                       childNodes' <- mapM (\i' -> do (Just c) <- item cs (fromIntegral i')
                                                      liftIO $ debugStrLn $ "l = " ++ show l ++ ", length children = " ++ show (length children) ++ ", i' = " ++ show i'
                                                      inc
-                                                     getNodes' c (children!!i') is'
+                                                     getNodes' c (children@@i') is'
                                           ) [0..(l-1)]
                       if (i == index)
                       then do return $ (i, currNode) : (concat childNodes')
