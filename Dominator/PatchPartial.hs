@@ -69,7 +69,7 @@ updateView isProtected (DHandle root vdom doc) newHtml =
      putMVar vdom newHtml
      pure ()
 
-apply :: (Html -> Bool) -> JSDocument -> JSNode -> Html -> Map Int [Patch] -> IO ()
+apply :: Debug => (Html -> Bool) -> JSDocument -> JSNode -> Html -> Map Int [Patch] -> IO ()
 apply isProtected document rootNode vdom patches =
   do let indices = Map.keys patches
      case indices of
@@ -226,7 +226,8 @@ getNodes isProtected currNode vdom nodeIndices = do
              put i'
              return i'
 
-      getNodes' :: JSNode
+      getNodes' :: Debug
+                => JSNode
                 -> Html
                 -> [Int]
                 -> StateT Int IO [(Int, JSNode)]
