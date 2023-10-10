@@ -17,7 +17,7 @@ import Data.Text (unpack)
 import qualified Data.Text as Text
 import Chili.Diff (Patch(..), diff)
 import Chili.Internal (debugStrLn, debugPrint)
-import Chili.Types (Control(..), EventName(..), Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, VDOMEvent(..), WithModel, addEventListener, childNodes, createJSElement, createJSTextNode, item, js_setTimeout, eventName, getFirstChild, getLength, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, toJSNode, appendChild, descendants, nodeType, currentDocument, newEvent, dispatchEvent)
+import Chili.Types ((@@), Control(..), EventName(..), Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, PatchIndexTooLarge(..), VDOMEvent(..), WithModel, addEventListener, childNodes, createJSElement, createJSTextNode, item, js_setTimeout, eventName, getFirstChild, getLength, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, toJSNode, appendChild, descendants, nodeType, currentDocument, newEvent, dispatchEvent)
 import Chili.TDVar (TDVar, readTDVar, cleanTDVar, isDirtyTDVar)
 import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
 
@@ -228,6 +228,7 @@ We return an assoc list of the (indices, node)
 
 -- FIXME: do not walk down DOM trees that contain no nodes if interest
 -}
+
 getNodes :: JSNode      -- ^ root node of DOM
          -> Html model -- ^ virtual DOM that matches the current DOM
          -> [Int]       -- ^ nodes indices we want (using in-order numbering)
@@ -286,7 +287,7 @@ getNodes currNode vdom nodeIndices = do
                       childNodes' <- mapM (\i' -> do (Just c) <- item cs (fromIntegral i')
                                                      liftIO $ debugStrLn $ "l = " ++ show l ++ ", length children = " ++ show (length children) ++ ", i' = " ++ show i'
                                                      inc
-                                                     getNodes' c (children!!i') is'
+                                                     getNodes' c (children @@ i') is'
                                           ) [0..(l-1)]
                       if (i == index)
                       then do return $ (i, currNode) : (concat childNodes')

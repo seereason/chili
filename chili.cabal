@@ -23,6 +23,7 @@ library
                        ghcjs-base,
                        lens,
                        mtl,
+                       safe,
                        stm,
                        template-haskell,
                        text

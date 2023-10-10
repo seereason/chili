@@ -7,6 +7,7 @@ module Chili.Types where
 
 import Control.Applicative (Applicative, Alternative)
 import Control.Concurrent (forkIO)
+import Control.Exception (Exception, throw)
 import Control.Monad (Monad, MonadPlus)
 import Control.Monad.Fix (mfix)
 import Control.Lens ((^.))
@@ -45,6 +46,7 @@ import qualified JavaScript.Web.MessageEvent (MessageEvent(..), MessageEventData
 import qualified JavaScript.Web.MessageEvent as MessageEvent
 import qualified JavaScript.Web.WebSocket as WebSockets
 import JavaScript.Web.WebSocket (WebSocket, WebSocketRequest(..), connect, send)
+import Safe
 
 instance Eq JSVal where
   a == b = js_eq a b
@@ -3513,3 +3515,12 @@ foreign import javascript unsafe "$r = $1[\"currentScript\"]" js_currentScript :
 currentScript :: (MonadIO m) => JSDocument -> m (Maybe JSElement)
 currentScript d =
   liftIO (fromJSVal =<< js_currentScript d)
+
+-- Instead of using (!!) in the diff/patch code, use (@@) which throws
+-- custom exception PatchIndexTooLarge.
+
+data PatchIndexTooLarge = PatchIndexTooLarge deriving Show
+instance Exception PatchIndexTooLarge
+  
+(@@) :: [a] -> Int -> a
+xs @@ i = maybe (throw PatchIndexTooLarge) id (atMay xs i)
