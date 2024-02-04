@@ -9,7 +9,7 @@ import Control.Monad (when)
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans (MonadIO(..))
 import Chili.Debug (Debug)
-import Chili.Types ((@@), JSDocument, JSElement(..), JSNode, JSNodeList, PatchIndexTooLarge(..), unJSNode, addEventListener, addEventListenerOpt, currentDocument, childNodes, deleteProperty, eventName, getFirstChild, getLength, item, parentNode, nodeType, item, toJSNode, removeAttribute, removeChild, replaceData, replaceChild, setAttribute, setProperty, insertBefore)
+import Chili.Types ((@@), JSDocument, JSElement(..), JSNode, JSNodeList, PatchIndexTooLarge(..), unJSNode, addEventListener, addEventListenerOpt, currentDocument, childNodes, deleteProperty, eventName, getFirstChild, getLength, item, parentNode, nodeType, item, toJSNode, removeAttribute, removeChild, replaceData, replaceChild, setAttribute, setProperty, insertBefore, setProperty', setAttribute')
 import Data.List (sort)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -51,8 +51,8 @@ renderHtml doc (Element tag mKey attrs children) =
      mapM_ (doAttr e) attrs
      pure (toJSNode e)
     where
-      doAttr elem (Attr k v)   = setAttribute elem k v
-      doAttr elem (Prop k v)   = setProperty elem k v
+      doAttr elem (Attr k v)   = setAttribute' elem k v
+      doAttr elem (Prop k v)   = setProperty' elem k v
       doAttr elem (EL eventType eventHandler) = do
         liftIO $ debugStrLn $ "Adding event listener for " ++ eventName eventType
         addEventListener elem eventType (\e -> {- putStrLn "eventHandler start" >> -} (eventHandler e) {- >> putStrLn "eventHandler end"-}) False
@@ -127,11 +127,11 @@ apply'' document body node patch =
                         case (unpack k) of
 --                          "value" -> setValue e v -- FIXME: this causes issues with the cursor position
                           _ -> do debugStrLn $ "setAttribute " ++ show (k,v)
-                                  setAttribute e k v) [ (k,v) | Attr k v <- newProps ]
+                                  setAttribute' e k v) [ (k,v) | Attr k v <- newProps ]
              mapM_ (\(k, v) ->
                         case (unpack k) of
 --                          "value" -> setValue e v -- FIXME: this causes issues with the cursor position
-                          _ -> setProperty e k v) [ (k,v) | Prop k v <- newProps ]
+                          _ -> setProperty' e k v) [ (k,v) | Prop k v <- newProps ]
              mapM_ (\k -> removeAttribute e k) removeAttrs
              mapM_ (\k -> deleteProperty e k)  removeProps
 
