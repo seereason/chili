@@ -1095,7 +1095,7 @@ setAttribute' self name value = liftIO $ do
   elementExists self >>= \case
     True -> js_setAttribute self (textToJSString name) (textToJSString value)
     False -> do
-      trace ("Chili.Types: elementExists -> False")
+      trace ("Chili.Types: elementExists " <> show self <> " -> False")
         (js_setAttribute self (textToJSString name) (textToJSString value)) -- try anyway
 
 foreign import javascript unsafe "$1[\"getAttribute\"]($2)"
