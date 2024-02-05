@@ -14,7 +14,6 @@ import Control.Lens ((^.))
 import Control.Lens.TH (makeLenses)
 import Control.Monad (when)
 import Control.Monad.Trans (MonadIO(..))
-import Chili.Debug (Debug)
 import Chili.Internal (debugPrint, debugStrLn)
 import Chili.TDVar (TDVar, isDirtyTDVar, cleanTDVar)
 import Control.Concurrent.STM (atomically)
@@ -35,7 +34,6 @@ import qualified Data.Text as Text
 -- import GHCJS.Prim (ToJSString(..), FromJSString(..))
 import qualified JavaScript.TypedArray.ArrayBuffer as ArrayBuffer
 import JavaScript.TypedArray.ArrayBuffer (ArrayBuffer, MutableArrayBuffer)
-import GHC.Stack
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 import GHCJS.Buffer as Buffer
 import GHCJS.Foreign (jsNull)
@@ -1083,17 +1081,13 @@ foreign import javascript unsafe "$1[\"setAttribute\"]($2, $3)"
         js_setAttribute :: JSElement -> JSString -> JSString -> IO ()
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Element.setAttribute Mozilla Element.setAttribute documentation>
-setAttribute :: (MonadIO m) => JSElement -> Text -> Text -> m ()
+setAttribute ::
+             (MonadIO m) =>
+               JSElement -> Text -> Text -> m ()
 setAttribute self name value
   = liftIO
       (js_setAttribute self (textToJSString name) (textToJSString value))
 
-setAttribute' :: (Debug, MonadIO m) => JSElement -> Text -> Text -> m ()
-setAttribute' self name value = liftIO $ do
-  b <- elementExists self
-  if b
-    then js_setAttribute self (textToJSString name) (textToJSString value)
-    else error ("Chili.types tried to setAttribute " <> show (name, value) <> " on a nonexistent element" <> show callStack)
 
 foreign import javascript unsafe "$1[\"getAttribute\"]($2)"
         js_getAttribute :: JSElement -> JSString -> IO JSVal
@@ -1128,13 +1122,6 @@ setProperty :: (MonadIO m, PToJSVal v) => JSElement -> Text -> v -> m ()
 setProperty self name value
   = liftIO
       (js_setProperty self (textToJSString name) (pToJSVal value))
-
-setProperty' :: (HasCallStack, MonadIO m, PToJSVal v) => JSElement -> Text -> v -> m ()
-setProperty' self name value = liftIO $ do
-  b <- elementExists self
-  if b
-    then js_setProperty self (textToJSString name) (pToJSVal value)
-    else error ("Chili.types tried to setProperty " <> show name <> " on a nonexistent element")
 
 foreign import javascript unsafe "delete $1[$2]"
     js_delete :: JSVal -> JSString -> IO ()
@@ -3537,19 +3524,3 @@ instance Exception PatchIndexTooLarge
   
 (@@) :: [a] -> Int -> a
 xs @@ i = maybe (throw PatchIndexTooLarge) id (atMay xs i)
-
-elementExists :: JSElement -> IO Bool
-elementExists = js_elementExists . unJSElement
-
-foreign import javascript unsafe "$r = document.body.contains($1)"
-  js_elementExists :: JSVal -> IO Bool
-
--- CB I'd like this to be ToJSString, but that is in ghcjs-dom and not yet imported in chili
--- hasMethod :: (ToJSString s) => JSElement -> s -> IO Bool
--- why doesn't ghcjs.foreign export its definition?
-
-hasMethod :: JSElement -> Text -> IO Bool
-hasMethod el prop = js_hasMethod (unJSElement el) (textToJSString prop)
-
-foreign import javascript unsafe "typeof ($1)[$2] === 'function'"
-  js_hasMethod :: JSVal -> JSString -> IO Bool
