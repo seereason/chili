@@ -2,7 +2,7 @@
 {-# language GeneralizedNewtypeDeriving, TypeApplications, AllowAmbiguousTypes, OverloadedStrings #-}
 {-# language RankNTypes, DataKinds, KindSignatures, PolyKinds, TypeFamilyDependencies #-}
 {-# language PatternSynonyms, UndecidableInstances #-}
-{-# language MultiParamTypeClasses #-}
+{-# language LambdaCase, MultiParamTypeClasses #-}
 module Chili.Types where
 
 import Control.Applicative (Applicative, Alternative)
@@ -1089,13 +1089,14 @@ setAttribute self name value
   = liftIO
       (js_setAttribute self (textToJSString name) (textToJSString value))
 
+-- Works but prints lots of nonexistent element messages
 setAttribute' :: (Debug, MonadIO m) => JSElement -> Text -> Text -> m ()
 setAttribute' self name value = liftIO $ do
-  b <- elementExists self
-  if b
-    then js_setAttribute self (textToJSString name) (textToJSString value)
-    else trace ("Chili.types tried to setAttribute " <> show (name, value) <> " on a nonexistent element") (pure ())
-    -- else error ("Chili.types tried to setAttribute " <> show (name, value) <> " on a nonexistent element" <> show callStack)
+  elementExists self >>= \case
+    True -> js_setAttribute self (textToJSString name) (textToJSString value)
+    False -> do
+      trace ("Chili.Types: elementExists " <> show self <> " -> False")
+        (js_setAttribute self (textToJSString name) (textToJSString value)) -- try anyway
 
 foreign import javascript unsafe "$1[\"getAttribute\"]($2)"
         js_getAttribute :: JSElement -> JSString -> IO JSVal
