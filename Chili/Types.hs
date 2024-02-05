@@ -33,6 +33,7 @@ import qualified Data.JSString as JS
 import Data.JSString.Text (textToJSString, textFromJSString)
 import qualified Data.Text as Text
 -- import GHCJS.Prim (ToJSString(..), FromJSString(..))
+import Debug.Trace (trace)
 import qualified JavaScript.TypedArray.ArrayBuffer as ArrayBuffer
 import JavaScript.TypedArray.ArrayBuffer (ArrayBuffer, MutableArrayBuffer)
 import GHC.Stack
@@ -1093,7 +1094,8 @@ setAttribute' self name value = liftIO $ do
   b <- elementExists self
   if b
     then js_setAttribute self (textToJSString name) (textToJSString value)
-    else error ("Chili.types tried to setAttribute " <> show (name, value) <> " on a nonexistent element" <> show callStack)
+    else trace ("Chili.types tried to setAttribute " <> show (name, value) <> " on a nonexistent element") (pure ())
+    -- else error ("Chili.types tried to setAttribute " <> show (name, value) <> " on a nonexistent element" <> show callStack)
 
 foreign import javascript unsafe "$1[\"getAttribute\"]($2)"
         js_getAttribute :: JSElement -> JSString -> IO JSVal
