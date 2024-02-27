@@ -1738,6 +1738,12 @@ foreign import javascript unsafe "$r = $1[\"data\"]" js_inputData ::
 inputData :: InputEventObject ev -> Maybe JSString
 inputData ev = nullableToMaybe (js_inputData ev)
 
+foreign import javascript unsafe "$r = $1[\"dataTransfer\"]" js_inputDataTransfer ::
+        InputEventObject ev -> Nullable DataTransfer
+
+inputDataTransfer :: InputEventObject ev -> Maybe DataTransfer
+inputDataTransfer ev = nullableToMaybe (js_inputDataTransfer ev)
+
 foreign import javascript unsafe "$r = $1[\"inputType\"]" inputType ::
         InputEventObject ev -> JSString
 
