@@ -1749,6 +1749,12 @@ foreign import javascript unsafe "$r = $1[\"inputType\"]" inputType ::
 
 foreign import javascript unsafe "$r = $1[\"isComposing\"]" isComposing ::
         InputEventObject ev -> Bool
+
+foreign import javascript unsafe "$1[\"getTargetRanges\"]()" js_getTargetRanges ::
+        InputEventObject ev -> IO JSVal
+
+getTargetRanges :: (MonadIO m) => InputEventObject ev -> m [Range]
+getTargetRanges ieo = liftIO ((js_getTargetRanges ieo) >>= fromJSValUnchecked)
 {-
 -- * FormDataEvent
 
