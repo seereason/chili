@@ -2974,6 +2974,14 @@ instance FromJSVal Range where
   fromJSVal = pure . fmap Range . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
+instance PFromJSVal Range where
+  pFromJSVal = Range
+  {-# INLINE pFromJSVal #-}
+
+instance PToJSVal Range where
+  pToJSVal (Range jsval) = jsval
+  {-# INLINE pToJSVal #-}
+
 foreign import javascript unsafe "new Range()"
   js_newRange :: IO Range
 
@@ -3533,6 +3541,66 @@ currentScript d =
 
 data PatchIndexTooLarge = PatchIndexTooLarge deriving Show
 instance Exception PatchIndexTooLarge
-  
+
 (@@) :: [a] -> Int -> a
 xs @@ i = maybe (throw PatchIndexTooLarge) id (atMay xs i)
+
+-- * caretPositionFromPoint and friends
+
+newtype CaretPos = CaretPos { unCaretPos :: JSVal } deriving Eq
+
+instance ToJSVal CaretPos where
+  toJSVal = toJSVal . unCaretPos
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal CaretPos where
+  fromJSVal = return . fmap CaretPos . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+instance PFromJSVal CaretPos where
+  pFromJSVal = CaretPos
+  {-# INLINE pFromJSVal #-}
+
+instance PToJSVal CaretPos where
+  pToJSVal (CaretPos jsval) = jsval
+  {-# INLINE pToJSVal #-}
+
+foreign import javascript unsafe "$r = document.caretPositionFromPoint"
+  hasCaretPositionFromPoint :: Bool
+
+foreign import javascript unsafe "$1[\"caretPositionFromPoint\"]($2,$3)"
+  caretPositionFromPoint :: JSDocument -> Double -> Double -> IO CaretPos
+
+foreign import javascript unsafe "$r = $1[\"offsetNode\"]"
+  offsetNode :: CaretPos -> JSNode
+
+foreign import javascript unsafe "$r = $1[\"offset\"]"
+  offset :: CaretPos -> Int
+
+
+foreign import javascript unsafe "$r = document.caretRangeFromPoint"
+  hasCaretRangeFromPoint :: Bool
+
+foreign import javascript unsafe "$1[\"caretRangeFromPoint\"]($2,$3)"
+  js_caretRangeFromPoint :: JSDocument -> Double -> Double -> IO (Nullable Range)
+
+caretRangeFromPoint :: (MonadIO m) => JSDocument -> Double -> Double -> m (Maybe Range)
+caretRangeFromPoint doc x y = liftIO (nullableToMaybe <$> js_caretRangeFromPoint doc x y)
+
+
+-- | uses `caretPositionFromPoint` or `caretRangeFromPoint` depending on availability.
+caretFromPoint :: JSDocument -> Double -> Double -> IO (Maybe (JSNode, Int))
+caretFromPoint doc x y
+  | hasCaretPositionFromPoint =
+      do cp <- caretPositionFromPoint doc x y
+         pure (Just (offsetNode cp, offset cp))
+  | hasCaretRangeFromPoint =
+      do mr <- caretRangeFromPoint doc x y
+         case mr of
+           Nothing  -> pure Nothing
+           (Just r) ->
+             do sc <- startContainer r
+                so <- startOffset r
+                pure (Just (sc, so))
+  | otherwise =
+      pure Nothing
