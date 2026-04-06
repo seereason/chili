@@ -19,7 +19,7 @@ import Chili.Diff (Patch(..), diff)
 import Chili.Internal (debugStrLn, debugPrint)
 import Chili.Types ((@@), Control(..), EventName(..), Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, PatchIndexTooLarge(..), VDOMEvent(..), WithModel, addEventListener, childNodes, createJSElement, createJSTextNode, item, js_setTimeout, eventName, getFirstChild, getLength, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, toJSNode, appendChild, descendants, nodeType, currentDocument, newEvent, dispatchEvent)
 import Chili.TDVar (TDVar, readTDVar, cleanTDVar, isDirtyTDVar)
-import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
+import GHC.JS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
 
 renderHtml :: (MonadIO m, MonadFail m) => Loop -> TDVar model -> (remote -> IO ()) -> TMVar (Html model) -> JSDocument -> JSNode -> Html model -> ((remote -> IO ()) -> model -> Html model) -> m (Maybe JSNode)
 renderHtml loop model sendWS htmlV doc body (Cntl (Control cmodel cinit cview) eventType eventHandler) view =

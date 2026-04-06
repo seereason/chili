@@ -2,7 +2,7 @@
 {-# language GeneralizedNewtypeDeriving, TypeApplications, AllowAmbiguousTypes, OverloadedStrings #-}
 {-# language RankNTypes, DataKinds, KindSignatures, PolyKinds, TypeFamilyDependencies #-}
 {-# language PatternSynonyms, UndecidableInstances #-}
-{-# language MultiParamTypeClasses #-}
+{-# language MultiParamTypeClasses, TypeOperators #-}
 module Chili.Types where
 
 import Control.Applicative (Applicative, Alternative)

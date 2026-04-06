@@ -1,4 +1,5 @@
 {-# LANGUAGE ExtendedDefaultRules, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings, TypeFamilies, RankNTypes #-}
+{-# language TypeOperators #-}
 module Chili.HSX where
 
 import Data.Monoid ((<>))
