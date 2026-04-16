@@ -20,7 +20,7 @@ library
                        haskell-src-meta,
                        html-parse,
                        hsx2hs,
-                       ghcjs-base,
+                       ghcjs-dom-javascript,
                        lens,
                        mtl,
                        safe,
