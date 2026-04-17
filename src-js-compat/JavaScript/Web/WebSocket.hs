@@ -1,0 +1,52 @@
+-- GHC JS backend compatibility shim for JavaScript.Web.WebSocket
+module JavaScript.Web.WebSocket
+  ( WebSocket(..)
+  , WebSocketRequest(..)
+  , connect
+  , send
+  , url
+  ) where
+
+import Data.Coerce (coerce)
+import GHC.JS.Prim (JSVal, toJSString)
+import GHC.JS.Foreign.Callback (asyncCallback1, Callback(..))
+import JavaScript.Web.MessageEvent (MessageEvent(..))
+
+newtype WebSocket = WebSocket { unWebSocket :: JSVal }
+
+data WebSocketRequest = WebSocketRequest
+  { url       :: String
+  , protocols :: [String]
+  , onClose   :: Maybe (JSVal -> IO ())
+  , onMessage :: Maybe (MessageEvent -> IO ())
+  }
+
+foreign import javascript unsafe "new WebSocket($1)"
+  js_newWebSocket :: JSVal -> IO JSVal
+
+foreign import javascript unsafe "$1[\"onmessage\"] = $2"
+  js_setOnMessage :: JSVal -> JSVal -> IO ()
+
+foreign import javascript unsafe "$1[\"onclose\"] = $2"
+  js_setOnClose :: JSVal -> JSVal -> IO ()
+
+foreign import javascript unsafe "$2[\"send\"]($1)"
+  js_send :: JSVal -> JSVal -> IO ()
+
+connect :: WebSocketRequest -> IO WebSocket
+connect req = do
+  ws <- js_newWebSocket (toJSString (url req))
+  case onMessage req of
+    Nothing      -> return ()
+    Just handler -> do
+      cb <- asyncCallback1 (\ev -> handler (MessageEvent ev))
+      js_setOnMessage ws (coerce cb)
+  case onClose req of
+    Nothing      -> return ()
+    Just handler -> do
+      cb <- asyncCallback1 handler
+      js_setOnClose ws (coerce cb)
+  return (WebSocket ws)
+
+send :: String -> WebSocket -> IO ()
+send str (WebSocket ws) = js_send (toJSString str) ws

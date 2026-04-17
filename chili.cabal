@@ -13,13 +13,14 @@ cabal-version:       >=1.10
 
 library
   build-depends:       aeson,
-                       base >=4.8 && <4.17,
+                       base >=4.8 && <5,
                        bytestring,
                        case-insensitive,
                        containers,
                        haskell-src-meta,
                        html-parse,
                        hsx2hs,
+                       jsaddle,
                        jsaddle-dom,
                        lens,
                        mtl,
@@ -27,6 +28,10 @@ library
                        stm,
                        template-haskell,
                        text
+  if impl(ghcjs)
+    build-depends:     ghcjs-base
+  if arch(javascript) && !impl(ghcjs)
+    hs-source-dirs:    src-js-compat
   default-language:    Haskell2010
   ghc-options:         -Werror=incomplete-patterns
   exposed-modules:
