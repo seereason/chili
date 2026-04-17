@@ -2053,8 +2053,8 @@ oldValue e = nullableToMaybe (js_oldValue e)
 foreign import javascript unsafe "$r = $1[\"url\"]" js_url ::
   StorageEventObject ev -> JSString
 
-url :: StorageEventObject ev -> JSString
-url e = js_url e
+storageUrl :: StorageEventObject ev -> JSString
+storageUrl e = js_url e
 
 
 -- * WheelEvent
