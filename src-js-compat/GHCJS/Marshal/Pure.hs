@@ -6,7 +6,8 @@ module GHCJS.Marshal.Pure
   ) where
 
 import Data.Coerce (coerce, Coercible)
-import Data.JSString (JSString(..))
+import Data.JSString (JSString(..), textToJSString)
+import qualified Data.Text as Text
 import GHC.JS.Prim (JSVal, jsNull)
 
 class PToJSVal a where
@@ -28,6 +29,9 @@ instance PFromJSVal JSVal where
 -- JSString is a newtype over JSVal
 instance PToJSVal JSString where
   pToJSVal (JSString v) = v
+
+instance PToJSVal Text.Text where
+  pToJSVal = pToJSVal . textToJSString
 
 instance PFromJSVal JSString where
   pFromJSVal = JSString

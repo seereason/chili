@@ -17,6 +17,18 @@ newtype JSString = JSString { unJSString :: JSVal }
 instance IsString JSString where
   fromString = pack
 
+instance Eq JSString where
+  a == b = unpack a == unpack b
+
+instance Ord JSString where
+  compare a b = compare (unpack a) (unpack b)
+
+instance Show JSString where
+  show = unpack
+
+instance Read JSString where
+  readsPrec p s = [(pack x, r) | (x, r) <- readsPrec p s]
+
 pack :: String -> JSString
 pack = JSString . toJSString
 
