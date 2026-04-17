@@ -6,7 +6,7 @@ module GHCJS.Marshal
   , fromJSValUnchecked
   ) where
 
-import GHC.JS.Prim (JSVal, jsNull)
+import GHC.JS.Prim (JSVal, jsNull, fromJSString, toJSString)
 
 class ToJSVal a where
   toJSVal :: a -> IO JSVal
@@ -23,6 +23,24 @@ instance ToJSVal JSVal where
 
 instance FromJSVal JSVal where
   fromJSVal = return . Just
+
+instance ToJSVal String where
+  toJSVal = return . toJSString
+
+instance {-# OVERLAPPING #-} FromJSVal String where
+  fromJSVal v = return (Just (fromJSString v))
+
+instance FromJSVal Char where
+  fromJSVal v = return (case fromJSString v of { (c:_) -> Just c; _ -> Nothing })
+
+foreign import javascript unsafe "(($1) => { return $1; })" js_toDouble   :: Double -> JSVal
+foreign import javascript unsafe "(($1) => { return $1; })" js_fromDouble :: JSVal -> Double
+
+instance ToJSVal Double where
+  toJSVal = return . js_toDouble
+
+instance FromJSVal Double where
+  fromJSVal = return . Just . js_fromDouble
 
 instance FromJSVal a => FromJSVal [a] where
   fromJSVal _ = return Nothing -- stub: JS array iteration not implemented

@@ -6,7 +6,8 @@ module GHCJS.Marshal.Pure
   ) where
 
 import Data.Coerce (coerce, Coercible)
-import GHC.JS.Prim (JSVal)
+import Data.Maybe (fromMaybe)
+import GHC.JS.Prim (JSVal, toJSString, fromJSString, jsNull)
 
 class PToJSVal a where
   pToJSVal :: a -> JSVal
@@ -23,3 +24,18 @@ instance PToJSVal JSVal where
 
 instance PFromJSVal JSVal where
   pFromJSVal = id
+
+-- JSString = String
+instance PToJSVal String where
+  pToJSVal = toJSString
+
+instance PFromJSVal String where
+  pFromJSVal = fromJSString
+
+-- Maybe JSString
+instance PToJSVal a => PToJSVal (Maybe a) where
+  pToJSVal Nothing  = jsNull
+  pToJSVal (Just a) = pToJSVal a
+
+instance PFromJSVal a => PFromJSVal (Maybe a) where
+  pFromJSVal = Just . pFromJSVal
