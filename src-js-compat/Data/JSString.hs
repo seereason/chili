@@ -8,10 +8,14 @@ module Data.JSString
   , textToJSString
   ) where
 
+import Data.String (IsString(..))
 import qualified Data.Text as Text
 import GHC.JS.Prim (JSVal, toJSString, fromJSString)
 
 newtype JSString = JSString { unJSString :: JSVal }
+
+instance IsString JSString where
+  fromString = pack
 
 pack :: String -> JSString
 pack = JSString . toJSString
