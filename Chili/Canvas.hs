@@ -10,10 +10,8 @@ import Data.Maybe (fromJust, fromMaybe)
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.JSString as JS
-import Data.JSString.Text (textToJSString, textFromJSString)
 import qualified Data.Text as Text
-import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
-import GHCJS.Types (IsJSVal(..), JSVal(..), JSString(..))
+import Language.Javascript.JSaddle (JSVal, JSString, IsJSVal(..), ToJSVal(..), FromJSVal(..), textToJSString, textFromJSString)
 
 
 foreign import javascript unsafe "$1[\"getContext\"](\"2d\")"

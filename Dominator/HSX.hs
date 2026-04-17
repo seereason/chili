@@ -3,11 +3,8 @@ module Dominator.HSX where
 
 import Data.Monoid ((<>))
 import Data.Text (Text, pack, unpack)
-import GHCJS.Marshal.Pure (pFromJSVal)
-import GHCJS.Types (JSVal(..), JSString(..))
+import Language.Javascript.JSaddle (JSVal, JSString, PFromJSVal(..), textFromJSString)
 import Dominator.Types (Attr(Attr, EL), Html(Element, CData), flattenCData, descendants)
-import qualified Data.JSString as JS
-import qualified Data.JSString.Text as JS
 
 default (Text)
 
@@ -45,8 +42,8 @@ class AsAttr a where
 instance AsAttr (KV Text Text) where
     asAttr (k := v) = Attr k v
 
-instance AsAttr (KV Text JS.JSString) where
-    asAttr (k := v) = Attr k (JS.textFromJSString v)
+instance AsAttr (KV Text JSString) where
+    asAttr (k := v) = Attr k (textFromJSString v)
 
 {-
 instance AsAttr model (KV Text model) where

@@ -1,7 +1,7 @@
 module Chili.Canvas.Image where
 
 import Chili.Canvas.Types (JSContext2D(..))
-import GHCJS.Types (IsJSVal(..), JSVal)
+import Language.Javascript.JSaddle (JSVal, IsJSVal(..))
 import JavaScript.TypedArray
 
 -- * Image

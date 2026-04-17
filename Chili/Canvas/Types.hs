@@ -1,7 +1,6 @@
 module Chili.Canvas.Types where
 
-import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
-import GHCJS.Types (IsJSVal(..), JSVal, isNull, isUndefined)
+import Language.Javascript.JSaddle (JSVal, IsJSVal(..), ToJSVal(..), FromJSVal(..), isNull, isUndefined)
 
 newtype JSContext2D = JSContext2D { unJSContext :: JSVal }
 

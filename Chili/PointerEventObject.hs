@@ -7,13 +7,8 @@ module Chili.PointerEventObject where
 
 import Chili.Types
 import Control.Monad.Trans (MonadIO(liftIO))
-import qualified Data.JSString as JS
-import Data.JSString.Text (textToJSString, textFromJSString)
 import Data.Data (Data, Typeable)
-import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
-import GHCJS.Marshal.Pure (PToJSVal(pToJSVal), PFromJSVal(pFromJSVal))
-import GHCJS.Nullable (Nullable(..), nullableToMaybe, maybeToNullable)
-import GHCJS.Types (IsJSVal(..), JSVal(..), JSString(..),  nullRef, isNull, isUndefined)
+import Language.Javascript.JSaddle (JSVal, JSString, IsJSVal(..), ToJSVal(..), FromJSVal(..), PToJSVal(..), PFromJSVal(..), Nullable(..), isNull, isUndefined, jsNull, textToJSString, textFromJSString)
 
 
 -- * PointerEvent properties (read-only)

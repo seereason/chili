@@ -29,23 +29,15 @@ import Data.Proxy (Proxy(..))
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.JSString as JS
-import Data.JSString.Text (textToJSString, textFromJSString)
 import qualified Data.Text as Text
 -- import GHCJS.Prim (ToJSString(..), FromJSString(..))
 import qualified JavaScript.TypedArray.ArrayBuffer as ArrayBuffer
 import JavaScript.TypedArray.ArrayBuffer (ArrayBuffer, MutableArrayBuffer)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 import GHCJS.Buffer as Buffer
-import GHCJS.Foreign (jsNull)
 import GHC.JS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
-import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
-import GHCJS.Marshal.Pure (PToJSVal(pToJSVal), PFromJSVal(pFromJSVal))
-import GHCJS.Nullable (Nullable(..), nullableToMaybe, maybeToNullable)
-import GHCJS.Types (IsJSVal(..), JSVal(..), JSString(..),  nullRef, isNull, isUndefined)
-import qualified JavaScript.Web.MessageEvent (MessageEvent(..), MessageEventData(..))
-import qualified JavaScript.Web.MessageEvent as MessageEvent
-import qualified JavaScript.Web.WebSocket as WebSockets
-import JavaScript.Web.WebSocket (WebSocket, WebSocketRequest(..), connect, send)
+import Language.Javascript.JSaddle (JSVal, JSString, IsJSVal(..), isNull, isUndefined, jsNull, jsg, new, ToJSVal(..), FromJSVal(..), PToJSVal(..), PFromJSVal(..), Nullable(..), textToJSString, textFromJSString)
+import Language.Javascript.JSaddle ((!), (#), (<#))
 import Safe
 
 instance Eq JSVal where
@@ -57,6 +49,74 @@ foreign import javascript unsafe
 maybeJSNullOrUndefined :: JSVal -> Maybe JSVal
 maybeJSNullOrUndefined r | isNull r || isUndefined r = Nothing
 maybeJSNullOrUndefined r = Just r
+
+-- | Not exported by jsaddle
+nullableToMaybe :: PFromJSVal a => Nullable a -> Maybe a
+nullableToMaybe (Nullable x) | isNull x  = Nothing
+                              | otherwise = Just (pFromJSVal x)
+
+maybeToNullable :: PToJSVal a => Maybe a -> Nullable a
+maybeToNullable Nothing  = Nullable jsNull
+maybeToNullable (Just x) = Nullable (pToJSVal x)
+
+-- * WebSocket message event (replaces JavaScript.Web.MessageEvent)
+
+newtype WSMessageEvent = WSMessageEvent { unWSMessageEvent :: JSVal }
+
+foreign import javascript unsafe "$1[\"data\"]"
+  js_wsMEData :: WSMessageEvent -> IO JSVal
+
+wsMessageData :: WSMessageEvent -> IO JSVal
+wsMessageData = js_wsMEData
+
+-- * WebSocket (replaces JavaScript.Web.WebSocket)
+
+newtype WebSocket = WebSocket { unWebSocket :: JSVal }
+
+instance ToJSVal WebSocket where
+  toJSVal = return . unWebSocket
+  {-# INLINE toJSVal #-}
+
+instance FromJSVal WebSocket where
+  fromJSVal = return . fmap WebSocket . maybeJSNullOrUndefined
+  {-# INLINE fromJSVal #-}
+
+data WebSocketRequest = WebSocketRequest
+  { url       :: Text
+  , protocols :: [Text]
+  , onClose   :: Maybe (JSVal -> IO ())
+  , onMessage :: Maybe (WSMessageEvent -> IO ())
+  }
+
+foreign import javascript unsafe "new WebSocket($1)"
+  js_wsNew :: JSString -> IO WebSocket
+
+foreign import javascript unsafe "$1[\"onmessage\"] = $2"
+  js_wsSetOnMessage :: WebSocket -> Callback (JSVal -> IO ()) -> IO ()
+
+foreign import javascript unsafe "$1[\"onclose\"] = $2"
+  js_wsSetOnClose :: WebSocket -> Callback (JSVal -> IO ()) -> IO ()
+
+foreign import javascript unsafe "$2[\"send\"]($1)"
+  js_wsSend :: JSString -> WebSocket -> IO ()
+
+connectWS :: WebSocketRequest -> IO WebSocket
+connectWS req = do
+  ws <- js_wsNew (textToJSString (url req))
+  case onMessage req of
+    Nothing -> return ()
+    Just handler -> do
+      cb <- asyncCallback1 (\ev -> handler (WSMessageEvent ev))
+      js_wsSetOnMessage ws cb
+  case onClose req of
+    Nothing -> return ()
+    Just handler -> do
+      cb <- asyncCallback1 handler
+      js_wsSetOnClose ws cb
+  return ws
+
+sendWS :: Text -> WebSocket -> IO ()
+sendWS str ws = js_wsSend (textToJSString str) ws
 
 class InstanceOf ty where
   instanceOf :: (PToJSVal a) => a -> Bool
@@ -2774,19 +2834,19 @@ foreign import javascript unsafe "$1[\"responseURL\"]"
 
 sendRemoteWS :: (ToJSON remote) => WebSocket -> remote -> IO ()
 sendRemoteWS ws remote =
-  do let jstr = JS.pack (C.unpack $ encode remote)
-     debugStrLn $ "send WS: " ++ JS.unpack jstr
-     WebSockets.send jstr ws
+  do let str = Text.pack (C.unpack $ encode remote)
+     debugStrLn $ "send WS: " ++ Text.unpack str
+     sendWS str ws
      debugStrLn $ "sent."
 
-initRemoteWS :: (ToJSON remote) => JS.JSString -> (MessageEvent.MessageEvent -> IO ()) -> IO (remote -> IO ())
+initRemoteWS :: (ToJSON remote) => Text -> (WSMessageEvent -> IO ()) -> IO (remote -> IO ())
 initRemoteWS url' onMessageHandler =
-    do let request = WebSocketRequest { JavaScript.Web.WebSocket.url       = url'
+    do let request = WebSocketRequest { url       = url'
                                       , protocols = []
                                       , onClose   = Nothing
                                       , onMessage = Just onMessageHandler
                                       }
-       ws <- WebSockets.connect request
+       ws <- connectWS request
        pure (sendRemoteWS ws)
 
 -- * DragEvent
@@ -3243,7 +3303,7 @@ type WithModel model = (model -> IO (Maybe model)) -> IO ()
 
 type Loop = forall model remote. (Show model, ToJSON remote) =>
             JSDocument -> JSNode -> model -> ((remote -> IO ()) -> TDVar model -> IO ()) ->
-            Maybe JS.JSString -> ((remote -> IO ()) -> MessageEvent.MessageEvent -> TDVar model -> IO ()) -> ((remote -> IO ()) -> model -> Html model) -> IO (TDVar model)
+            Maybe Text -> ((remote -> IO ()) -> WSMessageEvent -> TDVar model -> IO ()) -> ((remote -> IO ()) -> model -> Html model) -> IO (TDVar model)
 
 foreign import javascript unsafe "window[\"setTimeout\"]($1, $2)" js_setTimeout ::
   Callback (IO ()) -> Int -> IO ()

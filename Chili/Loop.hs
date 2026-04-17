@@ -11,10 +11,7 @@ import Chili.Patch
 import Chili.TDVar
 import Chili.Types
 import Data.Aeson (FromJSON, ToJSON, decodeStrict, encode)
-import Data.JSString.Text (textToJSString)
-import qualified Data.JSString as JS
 import Data.Text (Text)
-import JavaScript.Web.MessageEvent as MessageEvent (MessageEvent(..))
 
 {-
 -- this solution does not work because the event handler code is run
@@ -55,8 +52,8 @@ loop :: forall remote model. (ToJSON remote) =>
      -> JSNode
      -> model
      -> ((remote -> IO ()) -> TDVar model -> IO ())
-     -> Maybe JS.JSString
-     -> ((remote -> IO ()) -> MessageEvent.MessageEvent -> TDVar model -> IO ())
+     -> Maybe Text
+     -> ((remote -> IO ()) -> WSMessageEvent -> TDVar model -> IO ())
      -> ((remote -> IO ()) -> model -> Html model)
      -> IO (TDVar model)
 loop doc body initModel initAction murl handleWS view =

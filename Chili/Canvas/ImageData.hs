@@ -1,7 +1,7 @@
 module Chili.Canvas.ImageData where
 
 import Chili.Canvas.Types (JSContext2D(..))
-import GHCJS.Types (IsJSVal(..), JSVal)
+import Language.Javascript.JSaddle (JSVal, IsJSVal(..))
 
 -- * ImageData
 
