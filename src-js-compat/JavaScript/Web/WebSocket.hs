@@ -4,17 +4,17 @@ module JavaScript.Web.WebSocket
   , WebSocketRequest(..)
   , connect
   , send
-  , url
   ) where
 
-import GHC.JS.Prim (JSVal, toJSString)
+import Data.JSString (JSString(..), unpack)
+import GHC.JS.Prim (JSVal)
 import GHC.JS.Foreign.Callback (asyncCallback1, Callback(..))
 import JavaScript.Web.MessageEvent (MessageEvent(..))
 
 newtype WebSocket = WebSocket { unWebSocket :: JSVal }
 
 data WebSocketRequest = WebSocketRequest
-  { url       :: String
+  { url       :: JSString
   , protocols :: [String]
   , onClose   :: Maybe (JSVal -> IO ())
   , onMessage :: Maybe (MessageEvent -> IO ())
@@ -34,7 +34,7 @@ foreign import javascript unsafe "$2[\"send\"]($1)"
 
 connect :: WebSocketRequest -> IO WebSocket
 connect req = do
-  ws <- js_newWebSocket (toJSString (url req))
+  ws <- js_newWebSocket (unJSString (url req))
   case onMessage req of
     Nothing      -> return ()
     Just handler -> do
@@ -47,5 +47,5 @@ connect req = do
       js_setOnClose ws cb
   return (WebSocket ws)
 
-send :: String -> WebSocket -> IO ()
-send str (WebSocket ws) = js_send (toJSString str) ws
+send :: JSString -> WebSocket -> IO ()
+send (JSString v) (WebSocket ws) = js_send v ws
