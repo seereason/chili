@@ -6,8 +6,8 @@ module GHCJS.Marshal.Pure
   ) where
 
 import Data.Coerce (coerce, Coercible)
-import Data.Maybe (fromMaybe)
-import GHC.JS.Prim (JSVal, toJSString, fromJSString, jsNull)
+import Data.JSString (JSString(..))
+import GHC.JS.Prim (JSVal, jsNull)
 
 class PToJSVal a where
   pToJSVal :: a -> JSVal
@@ -25,12 +25,12 @@ instance PToJSVal JSVal where
 instance PFromJSVal JSVal where
   pFromJSVal = id
 
--- JSString = String
-instance PToJSVal String where
-  pToJSVal = toJSString
+-- JSString is a newtype over JSVal
+instance PToJSVal JSString where
+  pToJSVal (JSString v) = v
 
-instance PFromJSVal String where
-  pFromJSVal = fromJSString
+instance PFromJSVal JSString where
+  pFromJSVal = JSString
 
 -- Maybe JSString
 instance PToJSVal a => PToJSVal (Maybe a) where

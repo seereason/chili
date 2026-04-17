@@ -1,7 +1,7 @@
 -- GHC JS backend compatibility shim for Data.JSString
--- JSString is String for the GHC JS backend.
+-- JSString wraps JSVal so it is FFI-compatible (not [Char]).
 module Data.JSString
-  ( JSString
+  ( JSString(..)
   , pack
   , unpack
   , textFromJSString
@@ -9,17 +9,18 @@ module Data.JSString
   ) where
 
 import qualified Data.Text as Text
+import GHC.JS.Prim (JSVal, toJSString, fromJSString)
 
-type JSString = String
+newtype JSString = JSString { unJSString :: JSVal }
 
 pack :: String -> JSString
-pack = id
+pack = JSString . toJSString
 
 unpack :: JSString -> String
-unpack = id
+unpack = fromJSString . unJSString
 
 textFromJSString :: JSString -> Text.Text
-textFromJSString = Text.pack
+textFromJSString = Text.pack . unpack
 
 textToJSString :: Text.Text -> JSString
-textToJSString = Text.unpack
+textToJSString = pack . Text.unpack

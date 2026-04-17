@@ -11,8 +11,7 @@ module GHCJS.Types
 
 import Data.Coerce (coerce, Coercible)
 import GHC.JS.Prim (JSVal, isNull, isUndefined, jsNull)
-
-type JSString = String
+import Data.JSString (JSString(..))
 
 nullRef :: JSVal
 nullRef = jsNull

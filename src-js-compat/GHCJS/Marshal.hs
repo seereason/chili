@@ -6,6 +6,7 @@ module GHCJS.Marshal
   , fromJSValUnchecked
   ) where
 
+import Data.JSString (JSString(..))
 import GHC.JS.Prim (JSVal, jsNull, fromJSString, toJSString)
 
 class ToJSVal a where
@@ -23,6 +24,12 @@ instance ToJSVal JSVal where
 
 instance FromJSVal JSVal where
   fromJSVal = return . Just
+
+instance ToJSVal JSString where
+  toJSVal (JSString v) = return v
+
+instance FromJSVal JSString where
+  fromJSVal = return . Just . JSString
 
 instance ToJSVal String where
   toJSVal = return . toJSString
