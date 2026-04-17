@@ -42,7 +42,7 @@ import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 import GHCJS.Buffer as Buffer
 import GHCJS.Foreign (jsNull)
 import GHC.JS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
-import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
+import GHCJS.Marshal (ToJSVal(..), FromJSVal(..), fromJSValUnchecked)
 import GHCJS.Marshal.Pure (PToJSVal(pToJSVal), PFromJSVal(pFromJSVal))
 import GHCJS.Nullable (Nullable(..), nullableToMaybe, maybeToNullable)
 import GHCJS.Types (IsJSVal(..), JSVal(..), JSString(..),  nullRef, isNull, isUndefined)

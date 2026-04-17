@@ -3,8 +3,6 @@
 module GHCJS.Marshal.Pure
   ( PToJSVal(..)
   , PFromJSVal(..)
-  , pToJSVal
-  , pFromJSVal
   ) where
 
 import Data.Coerce (coerce, Coercible)
