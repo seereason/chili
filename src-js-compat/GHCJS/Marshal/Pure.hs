@@ -8,7 +8,7 @@ module GHCJS.Marshal.Pure
 import Data.Coerce (coerce, Coercible)
 import Data.JSString (JSString(..), textToJSString)
 import qualified Data.Text as Text
-import GHC.JS.Prim (JSVal, jsNull)
+import GHC.JS.Prim (JSVal, jsNull, toJSInt)
 
 class PToJSVal a where
   pToJSVal :: a -> JSVal
@@ -32,6 +32,10 @@ instance PToJSVal JSString where
 
 instance PToJSVal Text.Text where
   pToJSVal = pToJSVal . textToJSString
+
+instance PToJSVal Bool where
+  pToJSVal True  = toJSInt 1
+  pToJSVal False = toJSInt 0
 
 instance PFromJSVal JSString where
   pFromJSVal = JSString
