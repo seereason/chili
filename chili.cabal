@@ -31,7 +31,7 @@ library
   if impl(ghcjs)
     build-depends:     ghcjs-base
   if arch(javascript) && !impl(ghcjs)
-    hs-source-dirs:    src-js-compat
+    hs-source-dirs:    . src-js-compat
   default-language:    Haskell2010
   ghc-options:         -Werror=incomplete-patterns
   exposed-modules:
