@@ -14,7 +14,7 @@ cabal-version:       >=1.10
 library
   if arch(javascript)
       build-depends:       aeson,
-                           base >=4.8 && <4.17,
+                           base >=4.8 && <4.23,
                            bytestring,
                            case-insensitive,
                            containers,
