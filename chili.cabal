@@ -12,7 +12,7 @@ extra-source-files:  ChangeLog.md, README.md
 cabal-version:       >=1.10
 
 library
-  if arch(javascript)
+  if impl(ghcjs) || arch(javascript)
       build-depends:       aeson,
                            base >=4.8 && <4.23,
                            bytestring,
@@ -21,14 +21,17 @@ library
                            haskell-src-meta,
                            html-parse,
                            hsx2hs,
-                           ghcjs-base >= 0.8.0.2,
-                           ghcjs-dom-javascript >= 0.9.9.3,
                            lens,
                            mtl,
                            safe,
                            stm,
                            template-haskell,
                            text
+  if impl(ghcjs)
+      build-depends:       ghcjs-base
+  if arch(javascript)
+      build-depends:       ghcjs-dom-javascript >= 0.9.9.3,
+                           ghcjs-base >= 0.8.0.2
   default-language:    Haskell2010
   ghc-options:         -Werror=incomplete-patterns
   exposed-modules:
