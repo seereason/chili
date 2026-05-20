@@ -1,3 +1,8 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
+#if __GHCJS__
+{-# LANGUAGE JavaScriptFFI #-}
+#endif
 {-# language DataKinds, FlexibleContexts, GADTs, ScopedTypeVariables, PolyKinds #-}
 module Dominator.Types
        ( Html(..)

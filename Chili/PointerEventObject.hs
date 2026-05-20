@@ -1,3 +1,8 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
+#if __GHCJS__
+{-# LANGUAGE JavaScriptFFI #-}
+#endif
 {-# language DataKinds #-}
 {-# language DeriveDataTypeable #-}
 {-# language KindSignatures #-}

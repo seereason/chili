@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
+#if __GHCJS__
+{-# LANGUAGE JavaScriptFFI #-}
+#endif
+
 module Chili.Canvas where
 
 import Chili.Types as Chili
