@@ -969,7 +969,7 @@ remove self
 
 -- * removeChild
 
-foreign import javascript unsafe "($1) => return ($1[\"removeChild\"]($2))"
+foreign import javascript unsafe "(($1,$2) => { return ($1[\"removeChild\"]($2)); })"
         js_removeChild :: JSNode -> JSNode -> IO JSNode
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.removeChild Mozilla Node.removeChild documentation>

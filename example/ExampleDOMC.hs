@@ -8,7 +8,7 @@ import Control.Monad.Trans (MonadIO)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
 import Control.Concurrent.STM (atomically)
-import Chili.Types (unJSNode, getFirstChild, replaceChild, replaceWith, remove, removeChildren, ev)
+import Chili.Types (unJSNode, getFirstChild, replaceChild, replaceWith, remove, removeChildren, ev, parentNode, setTextContent)
 import Data.Char (toUpper)
 import Dominator.Types (JSDocument, JSElement, JSNode, MouseEvent(..), MouseEventObject(..), addEventListener, fromEventTarget, getAttribute, toJSNode, appendChild, currentDocument, removeChildren, target)
 import Dominator.DOMC
