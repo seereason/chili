@@ -29,11 +29,11 @@ getData i = js_getData i
 {-# INLINE getData #-}
 
 foreign import javascript unsafe
-  "($1) => return $1.width" js_width :: ImageData -> Int
+  "(($1) => { return $1.width; })" js_width :: ImageData -> Int
 foreign import javascript unsafe
-  "($1) => return $1.height" js_height :: ImageData -> Int
+  "(($1) => { return $1.height; })" js_height :: ImageData -> Int
 foreign import javascript unsafe
-  "($1) => return $1.data" js_getData :: ImageData -> Uint8ClampedArray
+  "(($1) => { return $1.data; })" js_getData :: ImageData -> Uint8ClampedArray
 
 putImageData :: JSContext2D
              -> ImageData
@@ -43,7 +43,7 @@ putImageData :: JSContext2D
 putImageData = js_putImageData
 {-# INLINE putImageData #-}
 
-foreign import javascript unsafe "($1,$2,$3,$4) => $1.putImageData($2,$3,$4)"
+foreign import javascript unsafe "(($1,$2,$3,$4) => $1.putImageData($2,$3,$4))"
   js_putImageData :: JSContext2D -> ImageData -> Int -> Int -> IO ()
 
 getImageData :: JSContext2D
@@ -55,7 +55,7 @@ getImageData :: JSContext2D
 getImageData = js_getImageData
 {-# INLINE getImageData #-}
 
-foreign import javascript unsafe "($1,$2,$3,$4,$5) => return $1.getImageData($2,$3,$4,$5)"
+foreign import javascript unsafe "(($1,$2,$3,$4,$5) => { return $1.getImageData($2,$3,$4,$5); })"
   js_getImageData :: JSContext2D -> Int -> Int -> Int -> Int -> IO ImageData
 
 -- each pixel is represented by four one-byte values (red, green, blue, and alpha, in that order; that is, "RGBA" format).
@@ -66,9 +66,9 @@ newImageData :: Maybe Uint8ClampedArray
 newImageData Nothing width height = js_newImageDataBlank width height
 newImageData (Just d) width height = js_newImageData d width height
 
-foreign import javascript unsafe "($1,$2) => return (new ImageData($1, $2))"
+foreign import javascript unsafe "(($1,$2) => { return (new ImageData($1, $2)); })"
         js_newImageDataBlank :: Int -> Int -> IO ImageData
 
-foreign import javascript unsafe "($1,$2,$3) => return (new ImageData($1, $2, $3))"
+foreign import javascript unsafe "(($1,$2,$3) => { return (new ImageData($1, $2, $3)); })"
         js_newImageData :: Uint8ClampedArray -> Int -> Int -> IO ImageData
 

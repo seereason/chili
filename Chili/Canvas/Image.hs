@@ -14,10 +14,10 @@ import JavaScript.TypedArray
 newtype Image    = Image      { unImage :: JSVal }
 instance IsJSVal Image
 
-foreign import javascript unsafe "($1) => $1[\"width\"]" width ::
+foreign import javascript unsafe "(($1) => $1[\"width\"])" width ::
          Image -> Int
 
-foreign import javascript unsafe "($1) => $1[\"height\"]" height ::
+foreign import javascript unsafe "(($1) => $1[\"height\"])" height ::
          Image -> Int
 
 drawImage :: JSContext2D
@@ -28,5 +28,5 @@ drawImage :: JSContext2D
 drawImage = js_drawImage
 {-# INLINE drawImage #-}
 
-foreign import javascript unsafe "($1,$2,$3,$4) => $1.drawImage($2,$3,$4)"
+foreign import javascript unsafe "(($1,$2,$3,$4) => $1.drawImage($2,$3,$4))"
   js_drawImage :: JSContext2D -> Image -> Int -> Int -> IO ()

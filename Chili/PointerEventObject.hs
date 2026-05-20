@@ -26,37 +26,37 @@ import GHCJS.Types (IsJSVal(..), JSVal(..), JSString(..),  nullRef, isNull, isUn
 newtype PointerId = PointerId { unPointerId :: Int }
   deriving (Eq, Ord, Read, Show, Data, Typeable)
 
-foreign import javascript unsafe "($1) => return $1[\"pointerId\"]" pointerId ::
+foreign import javascript unsafe "(($1) => { return $1[\"pointerId\"]; })" pointerId ::
         PointerEventObject ev -> PointerId
 
-foreign import javascript unsafe "($1) => return $1[\"width\"]" width ::
+foreign import javascript unsafe "(($1) => { return $1[\"width\"]; })" width ::
         PointerEventObject ev -> Double
 
-foreign import javascript unsafe "($1) => return $1[\"height\"]" height ::
+foreign import javascript unsafe "(($1) => { return $1[\"height\"]; })" height ::
         PointerEventObject ev -> Double
 
-foreign import javascript unsafe "($1) => return $1[\"pressure\"]" pressure ::
+foreign import javascript unsafe "(($1) => { return $1[\"pressure\"]; })" pressure ::
         PointerEventObject ev -> Float
 
-foreign import javascript unsafe "($1) => return $1[\"tangentialPressure\"]" tangentialPressure ::
+foreign import javascript unsafe "(($1) => { return $1[\"tangentialPressure\"]; })" tangentialPressure ::
         PointerEventObject ev -> Float
 
-foreign import javascript unsafe "($1) => return $1[\"tiltX\"]" tiltX ::
+foreign import javascript unsafe "(($1) => { return $1[\"tiltX\"]; })" tiltX ::
         PointerEventObject ev -> Int
 
-foreign import javascript unsafe "($1) => return $1[\"tiltY\"]" tiltY ::
+foreign import javascript unsafe "(($1) => { return $1[\"tiltY\"]; })" tiltY ::
         PointerEventObject ev -> Int
 
-foreign import javascript unsafe "($1) => return $1[\"twist\"]" twist ::
+foreign import javascript unsafe "(($1) => { return $1[\"twist\"]; })" twist ::
         PointerEventObject ev -> Int
 
-foreign import javascript unsafe "($1) => return $1[\"altitudeAngle\"]" altitudeAngle ::
+foreign import javascript unsafe "(($1) => { return $1[\"altitudeAngle\"]; })" altitudeAngle ::
         PointerEventObject ev -> Double
 
-foreign import javascript unsafe "($1) => return $1[\"azimuthAngle\"]" azimuthAngle ::
+foreign import javascript unsafe "(($1) => { return $1[\"azimuthAngle\"]; })" azimuthAngle ::
         PointerEventObject ev -> Double
 
-foreign import javascript unsafe "($1) => return $1[\"pointerType\"]" js_pointerType ::
+foreign import javascript unsafe "(($1) => { return $1[\"pointerType\"]; })" js_pointerType ::
         PointerEventObject ev -> JSString
 
 data PointerType
@@ -74,25 +74,25 @@ pointerType peo =
     "touch" -> Touch
     o       -> PointerOther o
 
-foreign import javascript unsafe "($1) => return $1[\"isPrimary\"]" isPrimary ::
+foreign import javascript unsafe "(($1) => { return $1[\"isPrimary\"]; })" isPrimary ::
         PointerEventObject ev -> Bool
 
 -- * extensions to the Element interface
 
-foreign import javascript unsafe "($1,$2) => $1[\"setPointerCapture\"]($2)" js_setPointerCapture ::
+foreign import javascript unsafe "(($1,$2) => $1[\"setPointerCapture\"]($2))" js_setPointerCapture ::
         JSElement -> PointerId -> IO ()
 
 setPointerCapture :: (MonadIO m) => JSElement -> PointerId -> m ()
 setPointerCapture e pid = liftIO $ js_setPointerCapture e pid
 
 
-foreign import javascript unsafe "($1,$2) => $1[\"releasePointerCapture\"]($2)" js_releasePointerCapture ::
+foreign import javascript unsafe "(($1,$2) => $1[\"releasePointerCapture\"]($2))" js_releasePointerCapture ::
         JSElement -> PointerId -> IO ()
 
 releasePointerCapture :: (MonadIO m) => JSElement -> PointerId -> m ()
 releasePointerCapture e pid = liftIO $ js_releasePointerCapture e pid
 
-foreign import javascript unsafe "($1,$2) => return $1[\"hasPointerCapture\"]($2)" js_hasPointerCapture ::
+foreign import javascript unsafe "(($1,$2) => { return $1[\"hasPointerCapture\"]($2); })" js_hasPointerCapture ::
         JSElement -> PointerId -> IO Bool
 
 hasPointerCapture :: (MonadIO m) => JSElement -> PointerId -> m Bool
