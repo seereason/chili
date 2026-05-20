@@ -16,7 +16,7 @@ import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
 import GHCJS.Types (IsJSVal(..), JSVal(..), JSString(..))
 
 
-foreign import javascript unsafe "$1[\"getContext\"](\"2d\")"
+foreign import javascript unsafe "($1) => $1[\"getContext\"](\"2d\")"
         js_getContext2d ::
         JSElement -> IO JSVal
 
@@ -24,7 +24,7 @@ getContext2D :: (MonadIO m) => JSElement -> m (Maybe JSContext2D)
 getContext2D elem = liftIO $ fromJSVal =<< js_getContext2d elem
 
 -- * Canvas
-foreign import javascript unsafe "$1[\"fillRect\"]($2, $3, $4, $5)"
+foreign import javascript unsafe "($1,$2,$3,$4,$5) => $1[\"fillRect\"]($2, $3, $4, $5)"
         js_fillRect ::
         JSContext2D -> Double -> Double -> Double -> Double -> IO ()
 
@@ -32,7 +32,7 @@ fillRect :: JSContext2D -> Double -> Double -> Double -> Double -> IO ()
 fillRect = js_fillRect
 
 
-foreign import javascript unsafe "$1[\"clearRect\"]($2, $3, $4, $5)"
+foreign import javascript unsafe "($1,$2,$3,$4,$5) => $1[\"clearRect\"]($2, $3, $4, $5)"
         js_clearRect ::
         JSContext2D -> Double -> Double -> Double -> Double -> IO ()
 
@@ -48,42 +48,42 @@ renderStyle (StyleColor color) = renderColor color
 renderStyle (StyleGradient _) = error "Chili.Canvas.renderStyle (StyleGradient _)"
 renderStyle (StylePattern _) = error "Chili.Canvas.renderStyle (StylePattern _)"
 
-foreign import javascript unsafe "$1[\"fillStyle\"] = $2"
+foreign import javascript unsafe "($1,$2) => $1[\"fillStyle\"] = $2"
         js_fillStyle ::
         JSContext2D -> JSString -> IO ()
 
 setFillStyle :: JSContext2D -> Style -> IO ()
 setFillStyle ctx style = js_fillStyle ctx (renderStyle style)
 
-foreign import javascript unsafe "$1[\"strokeStyle\"] = $2"
+foreign import javascript unsafe "($1,$2) => $1[\"strokeStyle\"] = $2"
         js_strokeStyle ::
         JSContext2D -> JSString -> IO ()
 
 setStrokeStyle :: JSContext2D -> Style -> IO ()
 setStrokeStyle ctx style = js_strokeStyle ctx (renderStyle style)
 
-foreign import javascript unsafe "$1[\"save\"]()"
+foreign import javascript unsafe "($1) => $1[\"save\"]()"
         js_save ::
         JSContext2D -> IO ()
 
 save :: (MonadIO m) => JSContext2D -> m ()
 save = liftIO . js_save
 
-foreign import javascript unsafe "$1[\"restore\"]()"
+foreign import javascript unsafe "($1) => $1[\"restore\"]()"
         js_restore ::
         JSContext2D -> IO ()
 
 restore :: (MonadIO m) => JSContext2D -> m ()
 restore = liftIO . js_restore
 
-foreign import javascript unsafe "$1[\"moveTo\"]($2, $3)"
+foreign import javascript unsafe "($1,$2,$3) => $1[\"moveTo\"]($2, $3)"
         js_moveTo ::
         JSContext2D -> Double -> Double -> IO ()
 
 moveTo :: (MonadIO m) => JSContext2D -> Double -> Double -> m ()
 moveTo ctx x y = liftIO $ js_moveTo ctx x y
 
-foreign import javascript unsafe "$1[\"lineTo\"]($2, $3)"
+foreign import javascript unsafe "($1,$2,$3) => $1[\"lineTo\"]($2, $3)"
         js_lineTo ::
         JSContext2D -> Double -> Double -> IO ()
 
@@ -91,35 +91,35 @@ lineTo :: (MonadIO m) => JSContext2D -> Double -> Double -> m ()
 lineTo ctx x y = liftIO $ js_lineTo ctx x y
 
 
-foreign import javascript unsafe "$1[\"arc\"]($2, $3, $4, $5, $6, $7)"
+foreign import javascript unsafe "($1,$2,$3,$4,$5,$6,$7) => $1[\"arc\"]($2, $3, $4, $5, $6, $7)"
         js_arc ::
         JSContext2D -> Double -> Double -> Double -> Double -> Double -> Bool -> IO ()
 
 arc :: (MonadIO m) => JSContext2D -> Double -> Double -> Double -> Double -> Double -> Bool -> m ()
 arc ctx x y radius startAngle endAngle counterClockwise = liftIO $ js_arc ctx x y radius startAngle endAngle counterClockwise
 
-foreign import javascript unsafe "$1[\"beginPath\"]()"
+foreign import javascript unsafe "($1) => $1[\"beginPath\"]()"
         js_beginPath ::
         JSContext2D -> IO ()
 
 beginPath :: (MonadIO m) => JSContext2D -> m ()
 beginPath = liftIO . js_beginPath
 
-foreign import javascript unsafe "$1[\"stroke\"]()"
+foreign import javascript unsafe "($1) => $1[\"stroke\"]()"
         js_stroke ::
         JSContext2D -> IO ()
 
 stroke :: (MonadIO m) => JSContext2D -> m ()
 stroke = liftIO . js_stroke
 
-foreign import javascript unsafe "$1[\"fill\"]()"
+foreign import javascript unsafe "($1) => $1[\"fill\"]()"
         js_fill ::
         JSContext2D -> IO ()
 
 fill :: (MonadIO m) => JSContext2D -> m ()
 fill = liftIO . js_fill
 
-foreign import javascript unsafe "$1[\"lineWidth\"] = $2"
+foreign import javascript unsafe "($1,$2) => $1[\"lineWidth\"] = $2"
         js_setLineWidth ::
         JSContext2D -> Double -> IO ()
 
@@ -129,14 +129,14 @@ setLineWidth ctx w = liftIO $ js_setLineWidth ctx w
 
 -- * Font/Text
 
-foreign import javascript unsafe "$1[\"font\"] = $2"
+foreign import javascript unsafe "($1,$2) => $1[\"font\"] = $2"
         js_font ::
         JSContext2D -> JSString -> IO ()
 
 setFont :: (MonadIO m) => JSContext2D -> JSString -> m ()
 setFont ctx font = liftIO $ js_font ctx font
 
-foreign import javascript unsafe "$1[\"textAlign\"] = $2"
+foreign import javascript unsafe "($1,$2) => $1[\"textAlign\"] = $2"
         js_textAlign ::
         JSContext2D -> JSString -> IO ()
 
@@ -158,10 +158,10 @@ textAlignToJSString AlignRight  = JS.pack "right"
 setTextAlign :: (MonadIO m) => JSContext2D -> TextAlign -> m ()
 setTextAlign ctx align = liftIO $ js_textAlign ctx (textAlignToJSString align)
 
-foreign import javascript unsafe "$1[\"fillText\"]($2, $3, $4)"
+foreign import javascript unsafe "($1,$2,$3,$4) => $1[\"fillText\"]($2, $3, $4)"
   js_fillText :: JSContext2D -> JSString -> Double -> Double -> IO ()
 
-foreign import javascript unsafe "$1[\"fillText\"]($2, $3, $4, $5)"
+foreign import javascript unsafe "($1,$2,$3,$4,$5) => $1[\"fillText\"]($2, $3, $4, $5)"
         js_fillTextMaxWidth ::
         JSContext2D -> JSString -> Double -> Double -> Double -> IO ()
 
@@ -178,13 +178,13 @@ fillText ctx txt x y (Just maxWidth) = liftIO $ js_fillTextMaxWidth ctx txt x y 
 
 -- * Various Transformations
 
-foreign import javascript unsafe "$1[\"scale\"]($2, $3)"
+foreign import javascript unsafe "($1,$2,$3) => $1[\"scale\"]($2, $3)"
   js_scale :: JSContext2D -> Double -> Double -> IO ()
 
 scale :: (MonadIO m) => JSContext2D -> Double -> Double -> m ()
 scale ctx x y = liftIO $ js_scale ctx x y
 
-foreign import javascript unsafe "$1[\"rotate\"]($2)"
+foreign import javascript unsafe "($1,$2) => $1[\"rotate\"]($2)"
   js_rotate :: JSContext2D -> Double -> IO ()
 
 -- | apply rotation to commands that draw on the canvas
@@ -194,7 +194,7 @@ rotate :: (MonadIO m) =>
       -> m ()
 rotate ctx r = liftIO $ js_rotate ctx r
 
-foreign import javascript unsafe "$1[\"translate\"]($2, $3)"
+foreign import javascript unsafe "($1,$2,$3) => $1[\"translate\"]($2, $3)"
   js_translate :: JSContext2D -> Double -> Double -> IO ()
 
 -- | apply translation to commands that draw on the canvas

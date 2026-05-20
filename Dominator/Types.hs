@@ -99,7 +99,7 @@ data DHandle =
 
 -- * appendChild
 
-foreign import javascript unsafe "$1[\"appendChild\"]($2)"
+foreign import javascript unsafe "($1,$2) => return $1[\"appendChild\"]($2)"
         js_appendChild :: JSNode -> JSNode -> IO JSNode
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.appendChild Mozilla Node.appendChild documentation>
@@ -112,7 +112,7 @@ appendChild self newChild
 
 -- * createTextNode
 
-foreign import javascript unsafe "$1[\"createTextNode\"]($2)"
+foreign import javascript unsafe "($1,$2) => return $1[\"createTextNode\"]($2)"
         js_createTextNode :: JSDocument -> JSString -> IO JSTextNode
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Document.createTextNode Mozilla Document.createTextNode documentation>
@@ -122,7 +122,7 @@ createJSTextNode document data'
 
 -- * createJSElement
 
-foreign import javascript unsafe "$1[\"createElement\"]($2)"
+foreign import javascript unsafe "($1,$2) => return $1[\"createElement\"]($2)"
         js_createJSElement ::
         JSDocument -> JSString -> IO JSElement
 
