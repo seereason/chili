@@ -999,7 +999,7 @@ replaceChild self newChild oldChild
 
 -- * replaceWith
 
-foreign import javascript unsafe "((a1) => a1[\"replaceWith\"](a2))"
+foreign import javascript unsafe "((a1,a2) => a1[\"replaceWith\"](a2))"
         js_replaceWith :: JSNode -> JSNode -> IO ()
 
 replaceWith :: (IsJSNode oldNode, IsJSNode newNode, MonadIO m) => oldNode -> newNode -> m ()
@@ -3175,7 +3175,7 @@ instance FromJSVal ClientRect where
   fromJSVal = return . fmap ClientRect . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
-foreign import javascript unsafe "a1[a2]"
+foreign import javascript unsafe "((a1,a2) => { return a1[a2]})"
  js_clientRectIx :: ClientRects -> Int -> IO ClientRect
 
 clientRectIx :: (MonadIO m) => ClientRects -> Int -> m ClientRect
@@ -3250,7 +3250,7 @@ type Loop = forall model remote. (Show model, ToJSON remote) =>
             JSDocument -> JSNode -> model -> ((remote -> IO ()) -> TDVar model -> IO ()) ->
             Maybe JS.JSString -> ((remote -> IO ()) -> MessageEvent.MessageEvent -> TDVar model -> IO ()) -> ((remote -> IO ()) -> model -> Html model) -> IO (TDVar model)
 
-foreign import javascript unsafe "(() => window[\"setTimeout\"](a1, a2))" js_setTimeout ::
+foreign import javascript unsafe "((a1,a2) => window[\"setTimeout\"](a1, a2))" js_setTimeout ::
   Callback (IO ()) -> Int -> IO ()
 
 -- * DataTransfer
@@ -3573,7 +3573,7 @@ instance PToJSVal CaretPos where
 foreign import javascript unsafe "(() => { return document.caretPositionFromPoint; })"
   hasCaretPositionFromPoint :: Bool
 
-foreign import javascript unsafe "((a1) => { return a1[\"caretPositionFromPoint\"](a2,a3); })"
+foreign import javascript unsafe "((a1,a2,a3) => { return a1[\"caretPositionFromPoint\"](a2,a3); })"
   caretPositionFromPoint :: JSDocument -> Double -> Double -> IO CaretPos
 
 foreign import javascript unsafe "((a1) => { return a1[\"offsetNode\"]; })"
