@@ -2072,7 +2072,7 @@ foreign import javascript unsafe "((a1) => { return a1[\"currentTarget\"]; })" j
 currentTarget :: (IsEventObject obj) => obj -> EventTarget
 currentTarget obj = js_currentTarget (asEventObject obj)
 
-foreign import javascript unsafe "((a1) => return a1[\"target\"])" js_target ::
+foreign import javascript unsafe "((a1) => { return a1[\"target\"]})" js_target ::
         EventObject ev -> EventTarget
 
 target :: (IsEventObject obj) => obj -> EventTarget
