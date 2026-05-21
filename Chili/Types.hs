@@ -984,7 +984,7 @@ removeChild self oldChild
 
 -- * replaceChild
 
-foreign import javascript unsafe "((a1) => { return (a1[\"replaceChild\"](a2, a3)); })"
+foreign import javascript unsafe "((a1,a2,a3) => { return (a1[\"replaceChild\"](a2, a3)); })"
         js_replaceChild :: JSNode -> JSNode -> JSNode -> IO JSNode
 
 replaceChild ::
