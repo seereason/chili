@@ -22,25 +22,34 @@ import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
 import GHCJS.Types (IsJSVal(..), JSVal(..), JSString(..))
 
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"getContext\"](\"2d\"))"
         js_getContext2d ::
         JSElement -> IO JSVal
+#endif
 
 getContext2D :: (MonadIO m) => JSElement -> m (Maybe JSContext2D)
 getContext2D elem = liftIO $ fromJSVal =<< js_getContext2d elem
 
 -- * Canvas
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4,a5) => a1[\"fillRect\"](a2, a3, a4, a5))"
         js_fillRect ::
         JSContext2D -> Double -> Double -> Double -> Double -> IO ()
+#endif
 
 fillRect :: JSContext2D -> Double -> Double -> Double -> Double -> IO ()
 fillRect = js_fillRect
 
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4,a5) => a1[\"clearRect\"](a2, a3, a4, a5))"
         js_clearRect ::
         JSContext2D -> Double -> Double -> Double -> Double -> IO ()
+#endif
 
 clearRect :: JSContext2D -> Double -> Double -> Double -> Double -> IO ()
 clearRect = js_clearRect
@@ -54,80 +63,112 @@ renderStyle (StyleColor color) = renderColor color
 renderStyle (StyleGradient _) = error "Chili.Canvas.renderStyle (StyleGradient _)"
 renderStyle (StylePattern _) = error "Chili.Canvas.renderStyle (StylePattern _)"
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"fillStyle\"] = a2)"
         js_fillStyle ::
         JSContext2D -> JSString -> IO ()
+#endif
 
 setFillStyle :: JSContext2D -> Style -> IO ()
 setFillStyle ctx style = js_fillStyle ctx (renderStyle style)
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"strokeStyle\"] = a2)"
         js_strokeStyle ::
         JSContext2D -> JSString -> IO ()
+#endif
 
 setStrokeStyle :: JSContext2D -> Style -> IO ()
 setStrokeStyle ctx style = js_strokeStyle ctx (renderStyle style)
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"save\"]())"
         js_save ::
         JSContext2D -> IO ()
+#endif
 
 save :: (MonadIO m) => JSContext2D -> m ()
 save = liftIO . js_save
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"restore\"]())"
         js_restore ::
         JSContext2D -> IO ()
+#endif
 
 restore :: (MonadIO m) => JSContext2D -> m ()
 restore = liftIO . js_restore
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"moveTo\"](a2, a3))"
         js_moveTo ::
         JSContext2D -> Double -> Double -> IO ()
+#endif
 
 moveTo :: (MonadIO m) => JSContext2D -> Double -> Double -> m ()
 moveTo ctx x y = liftIO $ js_moveTo ctx x y
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"lineTo\"](a2, a3))"
         js_lineTo ::
         JSContext2D -> Double -> Double -> IO ()
+#endif
 
 lineTo :: (MonadIO m) => JSContext2D -> Double -> Double -> m ()
 lineTo ctx x y = liftIO $ js_lineTo ctx x y
 
-
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4,a5,a6,a7) => a1[\"arc\"](a2, a3, a4, a5, a6, a7))"
         js_arc ::
         JSContext2D -> Double -> Double -> Double -> Double -> Double -> Bool -> IO ()
+#endif
 
 arc :: (MonadIO m) => JSContext2D -> Double -> Double -> Double -> Double -> Double -> Bool -> m ()
 arc ctx x y radius startAngle endAngle counterClockwise = liftIO $ js_arc ctx x y radius startAngle endAngle counterClockwise
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"beginPath\"]())"
         js_beginPath ::
         JSContext2D -> IO ()
+#endif
 
 beginPath :: (MonadIO m) => JSContext2D -> m ()
 beginPath = liftIO . js_beginPath
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"stroke\"]())"
         js_stroke ::
         JSContext2D -> IO ()
+#endif
 
 stroke :: (MonadIO m) => JSContext2D -> m ()
 stroke = liftIO . js_stroke
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"fill\"]())"
         js_fill ::
         JSContext2D -> IO ()
+#endif
 
 fill :: (MonadIO m) => JSContext2D -> m ()
 fill = liftIO . js_fill
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"lineWidth\"] = a2)"
         js_setLineWidth ::
         JSContext2D -> Double -> IO ()
+#endif
 
 setLineWidth :: (MonadIO m) => JSContext2D -> Double -> m ()
 setLineWidth ctx w = liftIO $ js_setLineWidth ctx w
@@ -135,16 +176,22 @@ setLineWidth ctx w = liftIO $ js_setLineWidth ctx w
 
 -- * Font/Text
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"font\"] = a2)"
         js_font ::
         JSContext2D -> JSString -> IO ()
+#endif
 
 setFont :: (MonadIO m) => JSContext2D -> JSString -> m ()
 setFont ctx font = liftIO $ js_font ctx font
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"textAlign\"] = a2)"
         js_textAlign ::
         JSContext2D -> JSString -> IO ()
+#endif
 
 data TextAlign
   = AlignStart
@@ -164,12 +211,18 @@ textAlignToJSString AlignRight  = JS.pack "right"
 setTextAlign :: (MonadIO m) => JSContext2D -> TextAlign -> m ()
 setTextAlign ctx align = liftIO $ js_textAlign ctx (textAlignToJSString align)
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4) => a1[\"fillText\"](a2, a3, a4))"
   js_fillText :: JSContext2D -> JSString -> Double -> Double -> IO ()
+#endif
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4,a5) => a1[\"fillText\"](a2, a3, a4, a5))"
         js_fillTextMaxWidth ::
         JSContext2D -> JSString -> Double -> Double -> Double -> IO ()
+#endif
 
 fillText :: (MonadIO m) =>
             JSContext2D
@@ -184,14 +237,20 @@ fillText ctx txt x y (Just maxWidth) = liftIO $ js_fillTextMaxWidth ctx txt x y 
 
 -- * Various Transformations
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"scale\"](a2, a3))"
   js_scale :: JSContext2D -> Double -> Double -> IO ()
+#endif
 
 scale :: (MonadIO m) => JSContext2D -> Double -> Double -> m ()
 scale ctx x y = liftIO $ js_scale ctx x y
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"rotate\"](a2))"
   js_rotate :: JSContext2D -> Double -> IO ()
+#endif
 
 -- | apply rotation to commands that draw on the canvas
 rotate :: (MonadIO m) =>
@@ -200,8 +259,11 @@ rotate :: (MonadIO m) =>
       -> m ()
 rotate ctx r = liftIO $ js_rotate ctx r
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"translate\"](a2, a3))"
   js_translate :: JSContext2D -> Double -> Double -> IO ()
+#endif
 
 -- | apply translation to commands that draw on the canvas
 translate :: (MonadIO m) =>

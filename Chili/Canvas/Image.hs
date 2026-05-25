@@ -14,11 +14,17 @@ import JavaScript.TypedArray
 newtype Image    = Image      { unImage :: JSVal }
 instance IsJSVal Image
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"width\"])" width ::
          Image -> Int
+#endif
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"height\"])" height ::
          Image -> Int
+#endif
 
 drawImage :: JSContext2D
           -> Image
@@ -28,5 +34,8 @@ drawImage :: JSContext2D
 drawImage = js_drawImage
 {-# INLINE drawImage #-}
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4) => a1.drawImage(a2,a3,a4))"
   js_drawImage :: JSContext2D -> Image -> Int -> Int -> IO ()
+#endif

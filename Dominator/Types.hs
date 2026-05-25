@@ -104,8 +104,11 @@ data DHandle =
 
 -- * appendChild
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"appendChild\"](a2); })"
         js_appendChild :: JSNode -> JSNode -> IO JSNode
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.appendChild Mozilla Node.appendChild documentation>
 appendChild :: (MonadIO m, IsJSNode self, IsJSNode newChild) =>
@@ -117,8 +120,11 @@ appendChild self newChild
 
 -- * createTextNode
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"createTextNode\"](a2); })"
         js_createTextNode :: JSDocument -> JSString -> IO JSTextNode
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Document.createTextNode Mozilla Document.createTextNode documentation>
 createJSTextNode :: (MonadIO m) => JSDocument -> Text -> m JSTextNode
@@ -127,8 +133,11 @@ createJSTextNode document data'
 
 -- * createJSElement
 
+#if __GHCJS__
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"createElement\"](a2); })"
         js_createJSElement ::
+#endif
         JSDocument -> JSString -> IO JSElement
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/JSDocument.createJSElement Mozilla JSDocument.createJSElement documentation>

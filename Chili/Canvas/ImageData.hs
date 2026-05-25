@@ -28,12 +28,26 @@ getData :: ImageData -> Uint8ClampedArray
 getData i = js_getData i
 {-# INLINE getData #-}
 
+#if __GHCJS__
+need to backport to ghchs
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe
   "((a1) => { return a1.width; })" js_width :: ImageData -> Int
+#endif
+
+#if __GHCJS__
+need to backport to ghchs
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe
   "((a1) => { return a1.height; })" js_height :: ImageData -> Int
+#endif
+
+#if __GHCJS__
+need to backport to ghchs
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe
   "((a1) => { return a1.data; })" js_getData :: ImageData -> Uint8ClampedArray
+#endif
 
 putImageData :: JSContext2D
              -> ImageData
@@ -55,8 +69,12 @@ getImageData :: JSContext2D
 getImageData = js_getImageData
 {-# INLINE getImageData #-}
 
+#if __GHCJS__
+need to backport to ghchs
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4,a5) => { return a1.getImageData(a2,a3,a4,a5); })"
   js_getImageData :: JSContext2D -> Int -> Int -> Int -> Int -> IO ImageData
+#endif
 
 -- each pixel is represented by four one-byte values (red, green, blue, and alpha, in that order; that is, "RGBA" format).
 newImageData :: Maybe Uint8ClampedArray
@@ -66,9 +84,16 @@ newImageData :: Maybe Uint8ClampedArray
 newImageData Nothing width height = js_newImageDataBlank width height
 newImageData (Just d) width height = js_newImageData d width height
 
+#if __GHCJS__
+need to backport to ghchs
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return (new ImageData(a1, a2)); })"
         js_newImageDataBlank :: Int -> Int -> IO ImageData
+#endif
 
+#if __GHCJS__
+need to backport to ghchs
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => { return (new ImageData(a1, a2, a3)); })"
         js_newImageData :: Uint8ClampedArray -> Int -> Int -> IO ImageData
-
+#endif
