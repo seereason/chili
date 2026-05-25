@@ -136,9 +136,9 @@ createJSTextNode document data'
 #if __GHCJS__
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"createElement\"](a2); })"
-        js_createJSElement ::
+        js_createJSElement :: JSDocument -> JSString -> IO JSElement
+
 #endif
-        JSDocument -> JSString -> IO JSElement
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/JSDocument.createJSElement Mozilla JSDocument.createJSElement documentation>
 createJSElement :: (MonadIO m) => JSDocument -> Text -> m JSElement
