@@ -34,7 +34,6 @@ instance Show Patch where
 diff :: Debug => (Html -> Bool) -> Html -> Maybe Html -> Map Int [Patch]
 diff isProtected a b = Map.fromListWith (flip (++)) (walk isProtected a b 0)
 
--- FIXME: does not handle changes to Events or Properties
 -- FIXME: we should be able to add and remove single attributes
 diffAttrs :: Debug => [Attr] -> [Attr] -> Int -> [(Int, [Patch])]
 diffAttrs attrsA attrsB index =
@@ -46,9 +45,36 @@ diffAttrs attrsA attrsB index =
               addAttrs = attrsB' \\ attrsA'
               removeProps = (map fst propsA') \\ (map fst propsB')
               addProps = propsB' \\ propsA'
-          in if (addProps == []) && (removeProps == []) && (addAttrs == []) && (removeAttrs == [])
+              -- Every listener the new element carries, always.
+              --
+              -- A handler is a function: there is no telling whether
+              -- this render's differs from the last one's, so the only
+              -- safe answer is to re-apply.  That is affordable because
+              -- 'setEventListener' replaces rather than accumulates,
+              -- and because per-element listeners are rare -- most
+              -- events are delegated from the root, and the ones that
+              -- are not are the ones that cannot bubble.
+              --
+              -- Dropping them, which is what this did before, means a
+              -- handler is attached only when its element is created.
+              -- An element that survives a re-render never gains one.
+              -- That is why a scroll handler on a page region shared
+              -- between pages never fired: the region is matched by tag
+              -- and position, so it is patched, never rebuilt.
+              --
+              -- Still missing: an element that had a listener and no
+              -- longer does keeps it.  Saying so needs the event names
+              -- that went away carried in the patch, and Props has no
+              -- room for them -- its two removal lists are attributes
+              -- and properties.  The listener is stale rather than
+              -- wrong, since it belongs to the same element.
+              listenersB = filter isListener attrsB
+              isListener (EL _ _) = True
+              isListener (ELO _ _ _) = True
+              isListener _ = False
+          in if (addProps == []) && (removeProps == []) && (addAttrs == []) && (removeAttrs == []) && (null listenersB)
              then []
-             else [(index, [Props ((map (\(k,v) -> Prop k v) addProps) ++ (map (\(k,v) -> Attr k v) addAttrs))
+             else [(index, [Props ((map (\(k,v) -> Prop k v) addProps) ++ (map (\(k,v) -> Attr k v) addAttrs) ++ listenersB)
                                   removeAttrs removeProps
                            ])
                   ]

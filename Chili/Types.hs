@@ -3164,6 +3164,80 @@ addEventListenerOpt self event callback (capture,once,passive) = liftIO $
          do (Just eventObject) <- fromJSVal ev
             callback eventObject
 
+-- * setEventListener
+
+-- | 'addEventListener', but at most one listener per element per event
+-- name: setting a second replaces the first.
+--
+-- This is the shape a virtual DOM needs.  'addEventListener' hands its
+-- 'Callback' to the browser and forgets it, and nothing here calls
+-- removeEventListener, so a listener once attached can never be taken
+-- off.  That leaves a diff with two bad options when an element
+-- survives a re-render: skip the listener, and a handler that appeared
+-- since the last render is never attached at all; or add it, and the
+-- element collects one listener per render, each closed over a
+-- render's worth of stale state.
+--
+-- Keeping the callback on the element under a known property lets the
+-- previous one come off before the new one goes on, which makes
+-- re-applying on every render both correct and cheap.
+--
+-- The ghcjs snippet is pasted inline rather than wrapped in a function,
+-- so its temporary is named for this module instead of something like
+-- @old@ that could collide with whatever surrounds it.
+#if __GHCJS__
+foreign import javascript unsafe
+  "if (!$1.__chiliListeners) { $1.__chiliListeners = {}; } var chiliPrev = $1.__chiliListeners[$2]; if (chiliPrev) { $1[\"removeEventListener\"]($2, chiliPrev, $4); } $1.__chiliListeners[$2] = $3; $1[\"addEventListener\"]($2, $3, $4);"
+   js_setEventListener :: EventTarget -> JSString -> Callback (JSVal -> IO ()) -> Bool -> IO ()
+#elif defined(javascript_HOST_ARCH)
+foreign import javascript unsafe
+  "((a1,a2,a3,a4) => { if (!a1.__chiliListeners) { a1.__chiliListeners = {}; } var chiliPrev = a1.__chiliListeners[a2]; if (chiliPrev) { a1[\"removeEventListener\"](a2, chiliPrev, a4); } a1.__chiliListeners[a2] = a3; a1[\"addEventListener\"](a2, a3, a4); })"
+   js_setEventListener :: EventTarget -> JSString -> Callback (JSVal -> IO ()) -> Bool -> IO ()
+#endif
+
+setEventListener :: forall m self k eventName. (MonadIO m, IsEventTarget self, KnownSymbol (UniqEventName (eventName :: k)), FromJSVal (EventObjectOf eventName)) =>
+                  self
+               -> EventName eventName
+               -> (EventObjectOf eventName -> IO ())
+               -> Bool
+               -> m ()
+setEventListener self event callback useCapture = liftIO $
+  do cb <- syncCallback1 ThrowWouldBlock callback'
+     let evStr = JS.pack $ eventName event
+     js_setEventListener (toEventTarget self) evStr cb useCapture
+  where
+    callback' = \ev ->
+         do (Just eventObject) <- fromJSVal ev
+            callback eventObject
+
+-- | 'addEventListenerOpt' with 'setEventListener's one-per-event-name
+-- replacement.  The old listener is removed with only its capture flag,
+-- which is the only one of the three that takes part in matching.
+#if __GHCJS__
+foreign import javascript unsafe
+  "if (!$1.__chiliListeners) { $1.__chiliListeners = {}; } var chiliPrev = $1.__chiliListeners[$2]; if (chiliPrev) { $1['removeEventListener']($2, chiliPrev, {'capture':$4}); } $1.__chiliListeners[$2] = $3; $1['addEventListener']($2, $3, {'capture':$4,'once':$5,'passive':$6});"
+   js_setEventListenerOpt :: EventTarget -> JSString -> Callback (JSVal -> IO ()) -> Bool -> Bool -> Bool -> IO ()
+#elif defined(javascript_HOST_ARCH)
+foreign import javascript unsafe
+  "((a1,a2,a3,a4,a5,a6) => { if (!a1.__chiliListeners) { a1.__chiliListeners = {}; } var chiliPrev = a1.__chiliListeners[a2]; if (chiliPrev) { a1[\"removeEventListener\"](a2, chiliPrev, {'capture':a4}); } a1.__chiliListeners[a2] = a3; a1[\"addEventListener\"](a2, a3, {'capture':a4,'once':a5,'passive':a6}); })"
+   js_setEventListenerOpt :: EventTarget -> JSString -> Callback (JSVal -> IO ()) -> Bool -> Bool -> Bool -> IO ()
+#endif
+
+setEventListenerOpt :: forall m self k eventName. (MonadIO m, IsEventTarget self, KnownSymbol (UniqEventName (eventName :: k)), FromJSVal (EventObjectOf eventName)) =>
+                  self
+               -> EventName eventName
+               -> (EventObjectOf eventName -> IO ())
+               -> (Bool, Bool, Bool)
+               -> m ()
+setEventListenerOpt self event callback (capture,once,passive) = liftIO $
+  do cb <- syncCallback1 ThrowWouldBlock callback'
+     let evStr = JS.pack $ eventName event
+     js_setEventListenerOpt (toEventTarget self) evStr cb capture once passive
+  where
+    callback' = \ev ->
+         do (Just eventObject) <- fromJSVal ev
+            callback eventObject
+
 #if __GHCJS__
 foreign import javascript unsafe "$1[\"dispatchEvent\"]($2)"
   js_dispatchEvent :: EventTarget -> EventObject ev -> IO ()

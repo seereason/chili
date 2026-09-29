@@ -10,7 +10,7 @@ import Control.Monad (when)
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans (MonadIO(..))
 import Chili.Debug (Debug)
-import Chili.Types ((@@), JSDocument, JSElement(..), JSNode, JSNodeList, PatchIndexTooLarge(..), unJSNode, addEventListener, addEventListenerOpt, currentDocument, childNodes, deleteProperty, eventName, getFirstChild, getLength, item, parentNode, nodeType, item, toJSNode, removeAttribute, removeChild, replaceData, replaceChild, setAttribute, setProperty, insertBefore)
+import Chili.Types ((@@), JSDocument, JSElement(..), JSNode, JSNodeList, PatchIndexTooLarge(..), unJSNode, addEventListener, addEventListenerOpt, setEventListener, setEventListenerOpt, IsEventTarget, currentDocument, childNodes, deleteProperty, eventName, getFirstChild, getLength, item, parentNode, nodeType, item, toJSNode, removeAttribute, removeChild, replaceData, replaceChild, setAttribute, setProperty, insertBefore)
 import Data.List (sort)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -41,13 +41,23 @@ renderHtml doc (Element tag mKey attrs children) =
     where
       doAttr elem (Attr k v)   = setAttribute elem k v
       doAttr elem (Prop k v)   = setProperty elem k v
-      doAttr elem (EL eventType eventHandler) = do
-        liftIO $ debugStrLn $ "Adding event listener for " ++ eventName eventType
-        addEventListener elem eventType (\e -> {- putStrLn "eventHandler start" >> -} (eventHandler e) {- >> putStrLn "eventHandler end"-}) False
-      doAttr elem (ELO eventType opts eventHandler) = do
-        liftIO $ debugStrLn $ "Adding event listener for " ++ eventName eventType
-        addEventListenerOpt elem eventType (\e -> {- putStrLn "eventHandler start" >> -} (eventHandler e) {- >> putStrLn "eventHandler end"-}) opts
+      doAttr elem a@(EL {})    = setListener elem a
+      doAttr elem a@(ELO {})   = setListener elem a
       doAttr _ (OnCreate _) = error "Dominator.Patch.renderHtml"
+
+-- | Put a listener on an element, replacing whatever was there for the
+-- same event name.  Shared by element creation and by the Props patch,
+-- so that an element gains a handler the same way whether it is new or
+-- was already on the page -- which is the whole point: a handler used
+-- to reach an element only at creation.
+setListener :: (Debug, MonadIO m, IsEventTarget self) => self -> Attr -> m ()
+setListener elem (EL eventType eventHandler) = do
+  liftIO $ debugStrLn $ "Setting event listener for " ++ eventName eventType
+  setEventListener elem eventType eventHandler False
+setListener elem (ELO eventType opts eventHandler) = do
+  liftIO $ debugStrLn $ "Setting event listener for " ++ eventName eventType
+  setEventListenerOpt elem eventType eventHandler opts
+setListener _ _ = pure ()
 
 updateView :: Debug => DHandle -> Html -> IO ()
 updateView (DHandle root vdom doc) newHtml =
@@ -107,7 +117,7 @@ apply'' document body node patch =
                                        replaceChild parent newChild node
                                        return ()
 
-      (Props newProps removeAttrs removeProps) -> -- FIXME: doesn't handle changes to events.
+      (Props newProps removeAttrs removeProps) ->
           do let e = JSElement $ unJSNode node
              debugStrLn $ "set Attr: " ++ show [ (k,v) | Attr k v <- newProps ]
              debugStrLn $ "set Prop: " ++ show [ (k,v) | Prop k v <- newProps ]
@@ -120,6 +130,11 @@ apply'' document body node patch =
                         case (unpack k) of
 --                          "value" -> setValue e v -- FIXME: this causes issues with the cursor position
                           _ -> setProperty e k v) [ (k,v) | Prop k v <- newProps ]
+             -- Event listeners.  'setEventListener' replaces the one it
+             -- finds for this event name rather than adding beside it,
+             -- so re-applying every render neither accumulates
+             -- listeners nor leaves an old closure in place.
+             mapM_ (setListener e) newProps
              mapM_ (\k -> removeAttribute e k) removeAttrs
              mapM_ (\k -> deleteProperty e k)  removeProps
 
