@@ -27,66 +27,88 @@ newtype PointerId = PointerId { unPointerId :: Int }
   deriving (Eq, Ord, Read, Show, Data, Typeable)
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"pointerId\"]" pointerId ::
+        PointerEventObject ev -> PointerId
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"pointerId\"]; })" pointerId ::
         PointerEventObject ev -> PointerId
 #endif
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"width\"]" width ::
+         Image -> Int
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"width\"]; })" width ::
         PointerEventObject ev -> Double
 #endif
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"height\"]" height ::
+         Image -> Int
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"height\"]; })" height ::
         PointerEventObject ev -> Double
 #endif
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"pressure\"]" pressure ::
+        PointerEventObject ev -> Float
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"pressure\"]; })" pressure ::
         PointerEventObject ev -> Float
 #endif
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"tangentialPressure\"]" tangentialPressure ::
+        PointerEventObject ev -> Float
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"tangentialPressure\"]; })" tangentialPressure ::
         PointerEventObject ev -> Float
 #endif
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"tiltX\"]" tiltX ::
+        PointerEventObject ev -> Int
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"tiltX\"]; })" tiltX ::
         PointerEventObject ev -> Int
 #endif
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"tiltY\"]" tiltY ::
+        PointerEventObject ev -> Int
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"tiltY\"]; })" tiltY ::
         PointerEventObject ev -> Int
 #endif
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"twist\"]" twist ::
+        PointerEventObject ev -> Int
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"twist\"]; })" twist ::
         PointerEventObject ev -> Int
 #endif
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"altitudeAngle\"]" altitudeAngle ::
+        PointerEventObject ev -> Double
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"altitudeAngle\"]; })" altitudeAngle ::
         PointerEventObject ev -> Double
 #endif
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"azimuthAngle\"]" azimuthAngle ::
+        PointerEventObject ev -> Double
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"azimuthAngle\"]; })" azimuthAngle ::
         PointerEventObject ev -> Double
 #endif
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"pointerType\"]" js_pointerType ::
+        PointerEventObject ev -> JSString
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"pointerType\"]; })" js_pointerType ::
         PointerEventObject ev -> JSString
@@ -108,6 +130,8 @@ pointerType peo =
     o       -> PointerOther o
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"isPrimary\"]" isPrimary ::
+        PointerEventObject ev -> Bool
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"isPrimary\"]; })" isPrimary ::
         PointerEventObject ev -> Bool
@@ -116,6 +140,8 @@ foreign import javascript unsafe "((a1) => { return a1[\"isPrimary\"]; })" isPri
 -- * extensions to the Element interface
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"setPointerCapture\"]($2)" js_setPointerCapture ::
+        JSElement -> PointerId -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"setPointerCapture\"](a2))" js_setPointerCapture ::
         JSElement -> PointerId -> IO ()
@@ -125,6 +151,8 @@ setPointerCapture :: (MonadIO m) => JSElement -> PointerId -> m ()
 setPointerCapture e pid = liftIO $ js_setPointerCapture e pid
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"releasePointerCapture\"]($2)" js_releasePointerCapture ::
+        JSElement -> PointerId -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"releasePointerCapture\"](a2))" js_releasePointerCapture ::
         JSElement -> PointerId -> IO ()
@@ -134,6 +162,8 @@ releasePointerCapture :: (MonadIO m) => JSElement -> PointerId -> m ()
 releasePointerCapture e pid = liftIO $ js_releasePointerCapture e pid
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"hasPointerCapture\"]($2)" js_hasPointerCapture ::
+        JSElement -> PointerId -> IO Bool
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"hasPointerCapture\"](a2); })" js_hasPointerCapture ::
         JSElement -> PointerId -> IO Bool

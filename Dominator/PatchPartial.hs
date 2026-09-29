@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# language RankNTypes #-}
 {- Apply some patches -}
@@ -22,7 +23,11 @@ import Chili.Internal (debugStrLn, debugPrint)
 import Chili.Types (Control(..), Html(..), Attr(..), JSDocument, JSElement(..), JSNode, Loop, VDOMEvent(..), WithModel, addEventListener, childNodes, createJSElement, createJSTextNode, item, js_setTimeout, getFirstChild, getLength, replaceData, setAttribute, setProperty, unJSNode, setValue, parentNode, removeChild, replaceChild, toJSNode, appendChild, descendants, nodeType, currentDocument, newEvent, dispatchEvent)
 import Chili.TDVar (TDVar, readTDVar, cleanTDVar, isDirtyTDVar)
 -}
+#if __GHCJS__
+import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
+#else
 import GHC.JS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
+#endif
 
 -- PatchPartial and DiffPartial are clones of Patch/Diff that support partial trees of the DOM,
 -- i.e., trees whose leaves in the specification may actually have DOM elements attached to them.

@@ -105,6 +105,8 @@ data DHandle =
 -- * appendChild
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"appendChild\"]($2)"
+        js_appendChild :: JSNode -> JSNode -> IO JSNode
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"appendChild\"](a2); })"
         js_appendChild :: JSNode -> JSNode -> IO JSNode
@@ -121,6 +123,8 @@ appendChild self newChild
 -- * createTextNode
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"createTextNode\"]($2)"
+        js_createTextNode :: JSDocument -> JSString -> IO JSTextNode
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"createTextNode\"](a2); })"
         js_createTextNode :: JSDocument -> JSString -> IO JSTextNode
@@ -134,6 +138,9 @@ createJSTextNode document data'
 -- * createJSElement
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"createElement\"]($2)"
+        js_createJSElement ::
+        JSDocument -> JSString -> IO JSElement
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"createElement\"](a2); })"
         js_createJSElement :: JSDocument -> JSString -> IO JSElement

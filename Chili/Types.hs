@@ -42,7 +42,11 @@ import JavaScript.TypedArray.ArrayBuffer (ArrayBuffer, MutableArrayBuffer)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 import GHCJS.Buffer as Buffer
 import GHCJS.Foreign (jsNull)
+#if __GHCJS__
+import GHCJS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
+#else
 import GHC.JS.Foreign.Callback (OnBlocked(..), Callback, asyncCallback, asyncCallback1, syncCallback1)
+#endif
 import GHCJS.Marshal (ToJSVal(..), FromJSVal(..))
 import GHCJS.Marshal.Pure (PToJSVal(pToJSVal), PFromJSVal(pFromJSVal))
 import GHCJS.Nullable (Nullable(..), nullableToMaybe, maybeToNullable)
@@ -56,8 +60,13 @@ import Safe
 instance Eq JSVal where
   a == b = js_eq a b
 
+#if __GHCJS__
+foreign import javascript unsafe
+  "$1===$2" js_eq :: JSVal  -> JSVal  -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe
   "((a1,a2) => { return (a1===a2); })" js_eq :: JSVal  -> JSVal  -> Bool
+#endif
 
 maybeJSNullOrUndefined :: JSVal -> Maybe JSVal
 maybeJSNullOrUndefined r | isNull r || isUndefined r = Nothing
@@ -69,8 +78,13 @@ class InstanceOf ty where
 instance InstanceOf JSElement where
   instanceOf a = js_instanceOfJSElement (pToJSVal a)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1 instanceof Element"
+  js_instanceOfJSElement :: JSVal -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return (a1 instanceof Element); })"
   js_instanceOfJSElement :: JSVal -> Bool
+#endif
 
 {-
 fromJSValUnchecked :: (FromJSVal a) => JSVal a -> IO a
@@ -81,8 +95,13 @@ fromJSValUnchecked j =
          (Just a) -> return a
 -}
 
+#if __GHCJS__
+foreign import javascript unsafe "alert($1)"
+  js_alert :: JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => alert(a1))"
   js_alert :: JSString -> IO ()
+#endif
 
 -- * JSNode
 
@@ -113,8 +132,13 @@ instance IsEventTarget JSNode where
 instance InstanceOf JSNode where
   instanceOf a = js_instanceOfJSNode (pToJSVal a)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1 instanceof Node"
+  js_instanceOfJSNode :: JSVal -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return (a1 instanceof Node); })"
   js_instanceOfJSNode :: JSVal -> Bool
+#endif
 
 -- * IsJSNode
 
@@ -138,8 +162,13 @@ instance IsParentNode JSElement
 instance IsParentNode JSDocument
 instance IsParentNode JSDocumentFragment
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"append\"]($2)"
+  js_append :: JSNode -> JSVal -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"append\"](a2))"
   js_append :: JSNode -> JSVal -> IO ()
+#endif
 
 {-
 To use this, we'd need to figure out how to call append with the spread operator,
@@ -155,8 +184,13 @@ appendNodeList parent nl = liftIO $
 
 This would work if we created an HTMLCollection datatype. But perhaps you want childNodes anyway?
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"children\"]"
+  js_children :: JSNode -> IO HTMLCollection
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"children\"]; })"
   js_children :: JSNode -> IO HTMLCollection
+#endif
 
 children :: (IsParentNode parent, MonadIO m) => parent -> m HTMLCollection
 children parent = liftIO $
@@ -185,8 +219,13 @@ instance FromJSVal EventTarget where
 class IsEventTarget o where
     toEventTarget :: o -> EventTarget
 
+#if __GHCJS__
+foreign import javascript unsafe "new EventTarget()"
+        js_newEventTarget :: IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "(() => { return (new EventTarget()); })"
         js_newEventTarget :: IO JSVal
+#endif
 
 newEventTarget :: (MonadIO m) => m EventTarget
 newEventTarget = liftIO $ EventTarget <$> js_newEventTarget
@@ -217,14 +256,24 @@ instance FromJSVal JSNodeList where
 instance IsJSNode JSNodeList where
     toJSNode = JSNode . unJSNodeList
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"length\"]" js_nodeListLength ::
+        JSNodeList -> IO Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"length\"]; })" js_nodeListLength ::
         JSNodeList -> IO Int
+#endif
 
 nodeListLength :: (MonadIO m) => JSNodeList -> m Int
 nodeListLength nodeList = liftIO $ js_nodeListLength nodeList
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"item\"]($2)" js_item ::
+        JSNodeList -> Word -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"item\"](a2))" js_item ::
         JSNodeList -> Word -> IO JSVal
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/NodeList.item Mozilla NodeList.item documentation>
 item ::
@@ -233,8 +282,13 @@ item self index
   = liftIO
       ((js_item (self) index) >>= fromJSVal)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"length\"]" js_length ::
+        JSNode -> IO Word
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"length\"]; })" js_length ::
         JSNode -> IO Word
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/NodeList.item Mozilla NodeList.item documentation>
 getLength :: (MonadIO m, IsJSNode self) => self -> m Word
@@ -246,14 +300,24 @@ getLength self
 
 -- * contenteditable
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"contentEditable\"] = $2"
+  js_setContentEditable :: JSElement -> Bool -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"contentEditable\"] = a2)"
   js_setContentEditable :: JSElement -> Bool -> IO ()
+#endif
 
 setContentEditable :: (MonadIO m) => JSElement -> Bool -> m ()
 setContentEditable e b = liftIO $ js_setContentEditable e b
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"contentEditable\"]"
+  js_getContentEditable :: JSElement -> IO Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"contentEditable\"]; })"
   js_getContentEditable :: JSElement -> IO Bool
+#endif
 
 getContentEditable :: (MonadIO m) => JSElement -> m Bool
 getContentEditable e = liftIO $ js_getContentEditable e
@@ -278,23 +342,38 @@ maskToDocumentPosition m = DocumentPosition
   , dpImplementationSpecific = (m .&. 32) == 32
   }
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"compareDocumentPosition\"]($2)"
+   js_compareDocumentPosition :: JSNode -> JSNode -> IO Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"compareDocumentPosition\"](a2); })"
    js_compareDocumentPosition :: JSNode -> JSNode -> IO Int
+#endif
 
 compareDocumentPosition :: (IsJSNode node, IsJSNode otherNode, MonadIO m) => node -> otherNode -> m DocumentPosition
 compareDocumentPosition node otherNode =
   liftIO $ maskToDocumentPosition <$> js_compareDocumentPosition (toJSNode node) (toJSNode otherNode)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"contains\"]($2)"
+   js_contains :: JSNode -> JSNode -> IO Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"contains\"](a2); })"
    js_contains :: JSNode -> JSNode -> IO Bool
+#endif
 
 contains :: (IsJSNode node, IsJSNode otherNode, MonadIO m) => node -> otherNode -> m Bool
 contains node otherNode = liftIO $ js_contains (toJSNode node) (toJSNode otherNode)
 
 -- * cloneNode
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"cloneNode\"]($2)"
+  js_cloneNode :: JSNode -> Bool -> IO JSNode
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"cloneNode\"](a2); })"
   js_cloneNode :: JSNode -> Bool -> IO JSNode
+#endif
 
 cloneNode :: (MonadIO m, IsJSNode self) => self -> Bool -> m JSNode
 cloneNode self deep =
@@ -302,8 +381,13 @@ cloneNode self deep =
 
 -- * parentNode
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"parentNode\"]"
+        js_parentNode :: JSNode -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"parentNode\"]; })"
         js_parentNode :: JSNode -> IO JSVal
+#endif
 
 parentNode :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
 parentNode self =
@@ -311,8 +395,13 @@ parentNode self =
 
 -- * parentElement
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"parentElement\"]"
+        js_parentElement :: JSNode -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"parentElement\"]; })"
         js_parentElement :: JSNode -> IO JSVal
+#endif
 
 parentElement :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSElement)
 parentElement self =
@@ -320,8 +409,13 @@ parentElement self =
 
 -- * nodeType
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"nodeType\"]"
+  js_nodeType :: JSNode -> IO Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"nodeType\"]; })"
   js_nodeType :: JSNode -> IO Int
+#endif
 
 nodeType :: (MonadIO m, IsJSNode self) => self -> m Int
 nodeType self = liftIO (js_nodeType $ toJSNode self)
@@ -345,8 +439,13 @@ nodeTypeString n =
 
 -- * nodeName
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"nodeName\"]"
+  js_nodeName :: JSNode -> IO JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"nodeName\"]; })"
   js_nodeName :: JSNode -> IO JSString
+#endif
 
 nodeName :: (MonadIO m, IsJSNode self) => self -> m JSString
 nodeName self = liftIO (js_nodeName $ toJSNode self)
@@ -380,18 +479,33 @@ instance IsEventTarget JSDocumentFragment where
 instance InstanceOf JSDocumentFragment where
   instanceOf a = js_instanceOfJSDocumentFragment (pToJSVal a)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1 instanceof DocumentFragment"
+  js_instanceOfJSDocumentFragment :: JSVal -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return (a1 instanceof DocumentFragment); })"
   js_instanceOfJSDocumentFragment :: JSVal -> Bool
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"firstElementChild\"]"
+        js_firstElementChild :: JSVal -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"firstElementChild\"]; })"
         js_firstElementChild :: JSVal -> IO JSVal
+#endif
 
 firstElementChild :: (MonadIO m, ToJSVal parent, IsParentNode parent) => parent -> m (Maybe JSElement)
 firstElementChild p
   = liftIO (fromJSVal =<< js_firstElementChild =<< toJSVal p)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"lastElementChild\"]"
+        js_lastElementChild :: JSVal -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"lastElementChild\"]; })"
         js_lastElementChild :: JSVal -> IO JSVal
+#endif
 
 lastElementChild :: (MonadIO m, ToJSVal parent, IsParentNode parent) => parent -> m (Maybe JSElement)
 lastElementChild p
@@ -432,18 +546,33 @@ instance IsEventTarget JSDocument where
 instance InstanceOf JSDocument where
   instanceOf a = js_instanceOfJSDocument (pToJSVal a)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1 instanceof Document"
+  js_instanceOfJSDocument :: JSVal -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return (a1 instanceof Document); })"
   js_instanceOfJSDocument :: JSVal -> Bool
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "new window[\"Document\"]()"
+        js_newDocument :: IO JSDocument
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "(() => { return (new window[\"Document\"]()); })"
         js_newDocument :: IO JSDocument
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Document Mozilla Document documentation>
 newJSDocument :: (MonadIO m) => m JSDocument
 newJSDocument = liftIO js_newDocument
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"implementation\"][\"createHTMLDocument\"]()"
+       js_createHTMLDocument :: JSDocument -> IO JSDocument
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return (a1[\"implementation\"][\"createHTMLDocument\"]()); })"
        js_createHTMLDocument :: JSDocument -> IO JSDocument
+#endif
 
 -- foreign import javascript unsafe "document.implementation.createHTMLDocument()"
 --        js_createHTMLDocument :: JSDocument -> IO JSDocument
@@ -453,32 +582,57 @@ createHTMLDocument :: JSDocument -> Maybe JSString -> IO JSDocument
 createHTMLDocument d mTitle =
   js_createHTMLDocument d
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = (typeof document === 'undefined') ? null : document"
+  ghcjs_currentDocument :: IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "(() => { return ((typeof document === 'undefined') ? null : document); })"
   ghcjs_currentDocument :: IO JSVal
+#endif
 
 currentDocument :: (MonadIO m) => m (Maybe JSDocument)
 currentDocument = liftIO $ fromJSVal =<< ghcjs_currentDocument
 
+#if __GHCJS__
+foreign import javascript unsafe "document = $1"
+   js_setCurrentDocument :: JSDocument -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => document = a1)"
    js_setCurrentDocument :: JSDocument -> IO ()
+#endif
 
 setCurrentDocument :: (MonadIO m) => JSDocument -> m ()
 setCurrentDocument doc = liftIO $ js_setCurrentDocument doc
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"document\"]"
+        js_document :: JSWindow -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"document\"]; })"
         js_document :: JSWindow -> IO JSVal
+#endif
 
 document :: (MonadIO m) => JSWindow -> m (Maybe JSDocument)
 document w = liftIO $ fromJSVal =<< js_document w
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"querySelector\"]($2)"
+        js_querySelector :: JSVal -> JSString -> IO (Nullable JSElement)
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"querySelector\"](a2); })"
         js_querySelector :: JSVal -> JSString -> IO (Nullable JSElement)
+#endif
 
 querySelector :: (MonadIO m, IsParentNode obj, PToJSVal obj) => obj -> JSString -> m (Maybe JSElement)
 querySelector o sel = liftIO (nullableToMaybe <$> js_querySelector (pToJSVal o) sel)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"body\"]"
+        js_body :: JSDocument -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"body\"]; })"
         js_body :: JSDocument -> IO JSVal
+#endif
 
 body :: (MonadIO m) => JSDocument -> m (Maybe JSElement)
 body d = liftIO $ fromJSVal =<< js_body d
@@ -585,23 +739,38 @@ commandStr Unlink = "unlink"
 commandStr UseCSS = "useCSS"
 commandStr StyleWithCSS = "styleWithCSS"
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"execCommand\"]($2,$3,$4)"
+        js_execCommand :: JSDocument -> JSString -> Bool -> JSVal -> IO Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4) => { return a1[\"execCommand\"](a2,a3,a4); })"
         js_execCommand :: JSDocument -> JSString -> Bool -> JSVal -> IO Bool
+#endif
 
 -- | TODO: many commands not implemented
 execCommand :: (MonadIO m) => JSDocument -> Command -> Bool -> Maybe JSString -> m Bool
 execCommand doc aCommand aShowDefaultUI aValueArgument  =
   liftIO $ js_execCommand doc (commandStr aCommand) aShowDefaultUI (maybe jsNull pToJSVal aValueArgument)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"queryCommandState\"]($2)"
+        js_queryCommandState :: JSDocument -> JSString -> IO Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"queryCommandState\"](a2); })"
         js_queryCommandState :: JSDocument -> JSString -> IO Bool
+#endif
 
 queryCommandState :: (MonadIO m) => JSDocument -> Command -> m Bool
 queryCommandState doc aCommand = liftIO (js_queryCommandState doc (commandStr aCommand))
 
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"queryCommandValue\"]($2)"
+        js_queryCommandValue :: JSDocument -> JSString -> IO JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"queryCommandValue\"](a2); })"
         js_queryCommandValue :: JSDocument -> JSString -> IO JSString
+#endif
 
 queryCommandValue :: (MonadIO m) => JSDocument -> Command -> m Text
 queryCommandValue doc aCommand =
@@ -631,56 +800,101 @@ instance PToJSVal JSWindow where
 instance IsEventTarget JSWindow where
     toEventTarget = EventTarget . unJSWindow
 
+#if __GHCJS__
+foreign import javascript unsafe "$1 instanceof Window"
+  js_instanceOfJSWindow :: JSVal -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return (a1 instanceof Window); })"
   js_instanceOfJSWindow :: JSVal -> Bool
+#endif
 
 instance InstanceOf JSWindow where
   instanceOf a = js_instanceOfJSWindow (pToJSVal a)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = (typeof window === 'undefined') ? null : window"
+  js_window :: IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "(() => { return ((typeof window === 'undefined') ? null : window); })"
   js_window :: IO JSVal
+#endif
 
 window :: (MonadIO m) => m (Maybe JSWindow)
 window = liftIO $ fromJSVal =<< js_window
 
+#if __GHCJS__
+foreign import javascript unsafe "window = $1"
+   js_setWindow :: JSWindow -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => window = a1)"
    js_setWindow :: JSWindow -> IO ()
+#endif
 
 setWindow :: (MonadIO m) => JSWindow -> m ()
 setWindow w = liftIO $ js_setWindow w
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"devicePixelRatio\"]"
+  js_devicePixelRatio :: JSWindow -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"devicePixelRatio\"]; })"
   js_devicePixelRatio :: JSWindow -> IO JSVal
+#endif
 
 devicePixelRatio :: (MonadIO m) => JSWindow -> m (Maybe Double)
 devicePixelRatio w = liftIO (fromJSVal =<< js_devicePixelRatio w)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"getSelection\"]()"
+  js_getSelection :: JSWindow -> IO Selection
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return (a1[\"getSelection\"]()); })"
   js_getSelection :: JSWindow -> IO Selection
+#endif
 
 getSelection :: (MonadIO m) => JSWindow -> m Selection
 getSelection w = liftIO (js_getSelection w)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"scrollX\"]"
+  js_scrollX :: JSWindow -> IO Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"scrollX\"]; })"
   js_scrollX :: JSWindow -> IO Double
+#endif
 
 scrollX :: (MonadIO m) => JSWindow -> m Double
 scrollX w = liftIO (js_scrollX w)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"scrollY\"]"
+  js_scrollY :: JSWindow -> IO Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"scrollY\"]; })"
   js_scrollY :: JSWindow -> IO Double
+#endif
 
 scrollY :: (MonadIO m) => JSWindow -> m Double
 scrollY w = liftIO (js_scrollY w)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"innerHeight\"]"
+  js_innerHeight :: JSWindow -> IO Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"innerHeight\"]; })"
   js_innerHeight :: JSWindow -> IO Double
+#endif
 
 innerHeight :: (MonadIO m) => JSWindow -> m Double
 innerHeight w = liftIO (js_innerHeight w)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"innerWidth\"]"
+  js_innerWidth :: JSWindow -> IO Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"innerWidth\"]; })"
   js_innerWidth :: JSWindow -> IO Double
+#endif
 
 innerWidth :: (MonadIO m) => JSWindow -> m Double
 innerWidth w = liftIO (js_innerWidth w)
@@ -712,35 +926,61 @@ instance PToJSVal JSElement where
 instance IsJSNode JSElement where
     toJSNode = JSNode . unJSElement
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"clientLeft\"]"
+        js_getClientLeft :: JSElement -> IO Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"clientLeft\"]; })"
         js_getClientLeft :: JSElement -> IO Double
+#endif
 
 getClientLeft :: (MonadIO m) => JSElement -> m Double
 getClientLeft = liftIO . js_getClientLeft
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"clientTop\"]"
+        js_getClientTop :: JSElement -> IO Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"clientTop\"]; })"
         js_getClientTop :: JSElement -> IO Double
+#endif
 
 getClientTop :: (MonadIO m) => JSElement -> m Double
 getClientTop = liftIO . js_getClientTop
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"clientWidth\"]"
+        js_getClientWidth :: JSElement -> IO Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"clientWidth\"]; })"
         js_getClientWidth :: JSElement -> IO Double
+#endif
 
 getClientWidth :: (MonadIO m) => JSElement -> m Double
 getClientWidth = liftIO . js_getClientWidth
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"clientHeight\"]"
+        js_getClientHeight :: JSElement -> IO Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"clientHeight\"]; })"
         js_getClientHeight :: JSElement -> IO Double
+#endif
 
 getClientHeight :: (MonadIO m) => JSElement -> m Double
 getClientHeight = liftIO . js_getClientHeight
 
 -- * createJSElement
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"createElement\"]($2)"
+        js_createJSElement ::
+        JSDocument -> JSString -> IO JSElement
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return (a1[\"createElement\"](a2)); })"
         js_createJSElement ::
         JSDocument -> JSString -> IO JSElement
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/JSDocument.createJSElement Mozilla JSDocument.createJSElement documentation>
 -- FIXME: can this actually return Nothing?
@@ -751,32 +991,57 @@ createJSElement document tagName
 
 -- * innerHTML
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"innerHTML\"] = $2"
+        js_setInnerHTML :: JSElement -> JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"innerHTML\"] = a2)"
         js_setInnerHTML :: JSElement -> JSString -> IO ()
+#endif
 
 setInnerHTML :: (MonadIO m) => JSElement -> JSString -> m ()
 setInnerHTML elm content = liftIO $ js_setInnerHTML elm content
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"innerHTML\"]"
+        js_getInnerHTML :: JSElement -> IO JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"innerHTML\"])"
         js_getInnerHTML :: JSElement -> IO JSString
+#endif
 
 getInnerHTML :: (MonadIO m) => JSElement -> m JSString
 getInnerHTML element = liftIO $ js_getInnerHTML element
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"outerHTML\"] = $2"
+        js_setOuterHTML :: JSElement -> JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"outerHTML\"] = a2)"
         js_setOuterHTML :: JSElement -> JSString -> IO ()
+#endif
 
 setOuterHTML :: (MonadIO m) => JSElement -> JSString -> m ()
 setOuterHTML elm content = liftIO $ js_setOuterHTML elm content
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"outerHTML\"]"
+        js_getOuterHTML :: JSElement -> IO JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"outerHTML\"]; })"
         js_getOuterHTML :: JSElement -> IO JSString
+#endif
 
 getOuterHTML :: (MonadIO m) => JSElement -> m JSString
 getOuterHTML element = liftIO $ js_getOuterHTML element
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"tagName\"]"
+  js_tagName :: JSElement -> IO JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"tagName\"]; })"
   js_tagName :: JSElement -> IO JSString
+#endif
 
 tagName :: (MonadIO m) => JSElement -> m Text
 tagName e =
@@ -785,8 +1050,13 @@ tagName e =
 
 -- * childNodes
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"childNodes\"]"
+        js_childNodes :: JSNode -> IO JSNodeList
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"childNodes\"]; })"
         js_childNodes :: JSNode -> IO JSNodeList
+#endif
 
 childNodes :: (MonadIO m, IsJSNode self) => self -> m JSNodeList
 childNodes self
@@ -798,9 +1068,15 @@ instance DocumentOrElement JSElement
 
 -- * getElementsByName
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"getElementsByName\"]($2)"
+        js_getElementsByName ::
+        JSDocument -> JSString -> IO JSNodeList
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"getElementsByName\"](a2); })"
         js_getElementsByName ::
         JSDocument -> JSString -> IO JSNodeList
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Document.getElementsByName Mozilla Document.getElementsByName documentation>
 getElementsByName ::
@@ -811,9 +1087,15 @@ getElementsByName self elementName
       ((js_getElementsByName self) elementName
        >>= return . Just)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"getElementsByClassName\"]($2)"
+        js_getElementsByClassNameE ::
+        JSElement -> JSString -> IO JSNodeList
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"getElementsByClassName\"](a2); })"
         js_getElementsByClassNameE ::
         JSElement -> JSString -> IO JSNodeList
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementsByClassName>
 getElementsByClassNameE ::
@@ -824,9 +1106,15 @@ getElementsByClassNameE elem elementName
       ((js_getElementsByClassNameE elem) elementName
        >>= return . Just)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"getElementsByTagName\"]($2)"
+        js_getElementsByTagName ::
+        JSNode -> JSString -> IO JSNodeList
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"getElementsByTagName\"](a2); })"
         js_getElementsByTagName ::
         JSNode -> JSString -> IO JSNodeList
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Document.getElementsByTagName Mozilla Document.getElementsByTagName documentation>
 getElementsByTagName :: (DocumentOrElement obj, MonadIO m) =>
@@ -836,9 +1124,15 @@ getElementsByTagName :: (DocumentOrElement obj, MonadIO m) =>
 getElementsByTagName self tagname
   = liftIO ((js_getElementsByTagName (toJSNode self) tagname) >>= return . Just)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"getElementById\"]($2)"
+        js_getElementsById ::
+        JSDocument -> JSString -> IO (Nullable JSElement)
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return (a1[\"getElementById\"](a2)); })"
         js_getElementsById ::
         JSDocument -> JSString -> IO (Nullable JSElement)
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Document.getElementsByTagName Mozilla Document.getElementsById documentation>
 getElementById ::
@@ -851,8 +1145,13 @@ getElementById self ident =
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.insertBefore Mozilla Node.insertBefore documentation>
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"insertAdjacentElement\"]($2, $3)"
+        js_insertAdjacentElement :: JSNode -> JSString -> JSNode -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => { return (a1[\"insertAdjacentElement\"](a2, a3)); })"
         js_insertAdjacentElement :: JSNode -> JSString -> JSNode -> IO JSVal
+#endif
 
 data AdjacentPosition
   = BeforeBegin -- ^ Before the targetElement itself
@@ -879,8 +1178,13 @@ insertAdjacentElement targetElement position newNode =
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.insertBefore Mozilla Node.insertBefore documentation>
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"insertBefore\"]($2, $3)"
+        js_insertBefore :: JSNode -> JSNode -> JSNode -> IO JSNode
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => { return (a1[\"insertBefore\"](a2, a3)); })"
         js_insertBefore :: JSNode -> JSNode -> JSNode -> IO JSNode
+#endif
 
 insertBefore :: (MonadIO m, IsJSNode parentNode, IsJSNode newNode, IsJSNode referenceNode) =>
                parentNode
@@ -892,8 +1196,13 @@ insertBefore parentNode newNode referenceNode =
 
 -- * appendChild
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"appendChild\"]($2)"
+        js_appendChild :: JSNode -> JSNode -> IO JSNode
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return (a1[\"appendChild\"](a2)); })"
         js_appendChild :: JSNode -> JSNode -> IO JSNode
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.appendChild Mozilla Node.appendChild documentation>
 
@@ -907,20 +1216,33 @@ appendChild self newChild
           (maybe (JSNode jsNull) ( toJSNode) newChild))
          >>= return . Just)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"focus\"]()" js_focus :: JSElement -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"focus\"](); })" js_focus :: JSElement -> IO ()
+#endif
 
 focus :: (MonadIO m) => JSElement -> m ()
 focus e = liftIO (js_focus e)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"blur\"]()" js_blur :: JSElement -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"blur\"]())" js_blur :: JSElement -> IO ()
+#endif
 
 blur :: (MonadIO m) => JSElement -> m ()
 blur e = liftIO (js_blur e)
 
 -- * textContent
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"textContent\"] = $2"
+        js_setTextContent :: JSVal -> JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"textContent\"] = a2)"
         js_setTextContent :: JSVal -> JSString -> IO ()
+#endif
 
 setTextContent :: (MonadIO m, IsJSNode self) =>
                   self
@@ -929,8 +1251,13 @@ setTextContent :: (MonadIO m, IsJSNode self) =>
 setTextContent self content =
     liftIO $ (js_setTextContent (unJSNode (toJSNode self)) (textToJSString content))
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"textContent\"]"
+        js_getTextContent :: JSVal -> IO JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"textContent\"]; })"
         js_getTextContent :: JSVal -> IO JSString
+#endif
 
 getTextContent :: (MonadIO m, IsJSNode self) =>
                   self
@@ -942,12 +1269,21 @@ getTextContent self =
 -- * replaceData
 
 -- FIMXE: perhaps only a TextNode?
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"replaceData\"]($2, $3, $4)" js_replaceData
+    :: JSNode
+    -> Word
+    -> Word
+    -> JSString
+    -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4) => a1[\"replaceData\"](a2, a3, a4))" js_replaceData
     :: JSNode
     -> Word
     -> Word
     -> JSString
     -> IO ()
+#endif
 
 replaceData :: (MonadIO m, IsJSNode self) =>
                self
@@ -960,8 +1296,13 @@ replaceData self start length string =
 
 -- * remove
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"remove\"]()"
+        js_remove :: JSNode -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"remove\"]())"
         js_remove :: JSNode -> IO ()
+#endif
 
 remove :: (MonadIO m, IsJSNode self) => self -> m ()
 remove self
@@ -969,8 +1310,13 @@ remove self
 
 -- * removeChild
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"removeChild\"]($2)"
+        js_removeChild :: JSNode -> JSNode -> IO JSNode
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return (a1[\"removeChild\"](a2)); })"
         js_removeChild :: JSNode -> JSNode -> IO JSNode
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.removeChild Mozilla Node.removeChild documentation>
 removeChild ::  -- FIMXE: really a maybe?
@@ -984,8 +1330,13 @@ removeChild self oldChild
 
 -- * replaceChild
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"replaceChild\"]($2, $3)"
+        js_replaceChild :: JSNode -> JSNode -> JSNode -> IO JSNode
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => { return (a1[\"replaceChild\"](a2, a3)); })"
         js_replaceChild :: JSNode -> JSNode -> JSNode -> IO JSNode
+#endif
 
 replaceChild ::
             (MonadIO m, IsJSNode self, IsJSNode newChild, IsJSNode oldChild) =>
@@ -999,16 +1350,26 @@ replaceChild self newChild oldChild
 
 -- * replaceWith
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"replaceWith\"]($2)"
+        js_replaceWith :: JSNode -> JSNode -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"replaceWith\"](a2))"
         js_replaceWith :: JSNode -> JSNode -> IO ()
+#endif
 
 replaceWith :: (IsJSNode oldNode, IsJSNode newNode, MonadIO m) => oldNode -> newNode -> m ()
 replaceWith old new = liftIO $ js_replaceWith (toJSNode old) (toJSNode new)
 
 -- * firstChild
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"firstChild\"]"
+        js_getFirstChild :: JSNode -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"firstChild\"]; })"
         js_getFirstChild :: JSNode -> IO JSVal
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.firstChild Mozilla Node.firstChild documentation>
 getFirstChild :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
@@ -1020,8 +1381,13 @@ firstChild = getFirstChild
 
 -- * lastChild
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"lastChild\"]"
+        js_lastChild :: JSNode -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return (a1[\"lastChild\"]); })"
         js_lastChild :: JSNode -> IO JSVal
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.firstChild Mozilla Node.firstChild documentation>
 lastChild :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
@@ -1044,8 +1410,13 @@ removeChildren self =
 
 -- * nextSibling
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"nextSibling\"]"
+        js_nextSibling :: JSNode -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"nextSibling\"]; })"
         js_nextSibling :: JSNode -> IO JSVal
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.nextSibling Mozilla Node.nextSibling documentation>
 nextSibling :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
@@ -1054,8 +1425,13 @@ nextSibling self
 
 -- * nextElementSibling
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"nextElementSibling\"]"
+        js_nextElementSibling :: JSNode -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"nextElementSibling\"]; })"
         js_nextElementSibling :: JSNode -> IO JSVal
+#endif
 
 -- | <https://developer.mozilla.org/en-us/docs/Web/API/NonDocumentTypeChildNode/nextElementSibling Mozilla nextElementSibling documentation>
 nextElementSibling :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSElement)
@@ -1063,8 +1439,13 @@ nextElementSibling self
   = liftIO ((js_nextElementSibling ((toJSNode self))) >>= fromJSVal)
 
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"previousSibling\"]"
+        js_previousSibling :: JSNode -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"previousSibling\"]; })"
         js_previousSibling :: JSNode -> IO JSVal
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Node.previousSibling Mozilla Node.previousSibling documentation>
 previousSibling :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSNode)
@@ -1073,8 +1454,13 @@ previousSibling self
 
 -- * previousElementSibling
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"previousElementSibling\"]"
+        js_previousElementSibling :: JSNode -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"previousElementSibling\"]; })"
         js_previousElementSibling :: JSNode -> IO JSVal
+#endif
 
 -- | <https://developer.mozilla.org/en-us/docs/Web/API/NonDocumentTypeChildNode/previousElementSibling Mozilla previousElementSibling documentation>
 previousElementSibling :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSElement)
@@ -1082,8 +1468,13 @@ previousElementSibling self
   = liftIO ((js_previousElementSibling ((toJSNode self))) >>= fromJSVal)
 
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"setAttribute\"]($2, $3)"
+        js_setAttribute :: JSElement -> JSString -> JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"setAttribute\"](a2, a3))"
         js_setAttribute :: JSElement -> JSString -> JSString -> IO ()
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Element.setAttribute Mozilla Element.setAttribute documentation>
 setAttribute ::
@@ -1094,8 +1485,13 @@ setAttribute self name value
       (js_setAttribute self (textToJSString name) (textToJSString value))
 
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"getAttribute\"]($2)"
+        js_getAttribute :: JSElement -> JSString -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return (a1[\"getAttribute\"](a2)); })"
         js_getAttribute :: JSElement -> JSString -> IO JSVal
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Element.setAttribute Mozilla Element.setAttribute documentation>
 getAttribute :: (MonadIO m) =>
@@ -1104,44 +1500,74 @@ getAttribute :: (MonadIO m) =>
              -> m (Maybe JSString)
 getAttribute self name = liftIO (pFromJSVal <$> js_getAttribute self name)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"removeAttribute\"]($2)"
+        js_removeAttribute :: JSElement -> JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"removeAttribute\"](a2))"
         js_removeAttribute :: JSElement -> JSString -> IO ()
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/Element.removeAttribute Mozilla Element.removeAttribute documentation>
 removeAttribute :: (MonadIO m) =>
                 JSElement -> Text -> m ()
 removeAttribute self name = liftIO (js_removeAttribute self (textToJSString name))
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"style\"][$2] = $3"
+        js_setStyle :: JSElement -> JSString -> JSVal -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"style\"][a2] = a3)"
         js_setStyle :: JSElement -> JSString -> JSVal -> IO ()
+#endif
 
 setStyle :: (MonadIO m, PToJSVal v) => JSElement -> JSString -> v -> m ()
 setStyle self name value
   = liftIO
       (js_setStyle self name (pToJSVal value))
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[$2] = $3"
+        js_setProperty :: JSElement -> JSString -> JSVal -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[a2] = a3)"
         js_setProperty :: JSElement -> JSString -> JSVal -> IO ()
+#endif
 
 setProperty :: (MonadIO m, PToJSVal v) => JSElement -> Text -> v -> m ()
 setProperty self name value
   = liftIO
       (js_setProperty self (textToJSString name) (pToJSVal value))
 
+#if __GHCJS__
+foreign import javascript unsafe "delete $1[$2]"
+    js_delete :: JSVal -> JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => delete a1[a2])"
     js_delete :: JSVal -> JSString -> IO ()
+#endif
 
 deleteProperty :: (MonadIO m) => JSElement -> Text -> m ()
 deleteProperty e n = liftIO (js_delete (unJSElement e) (textToJSString n))
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"checked\"]"
+  js_getChecked :: JSElement -> IO Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"checked\"]; })"
   js_getChecked :: JSElement -> IO Bool
+#endif
 
 getChecked :: (MonadIO m) => JSElement -> m Bool
 getChecked e = liftIO $ js_getChecked e
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"checked\"] = $2"
+        js_setChecked :: JSElement -> Bool -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"checked\"] = a2)"
         js_setChecked :: JSElement -> Bool -> IO ()
+#endif
 
 setChecked :: (MonadIO m) => JSElement -> Bool -> m ()
 setChecked e b = liftIO $ js_setChecked e b
@@ -1153,11 +1579,21 @@ class (PToJSVal a) => Scrollable a
 instance Scrollable JSWindow
 instance Scrollable JSElement
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"scrollTop\"]" js_scrollTop ::
+        JSElement -> IO Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"scrollTop\"]; })" js_scrollTop ::
         JSElement -> IO Double
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"scrollLeft\"]" js_scrollLeft ::
+        JSElement -> IO Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"scrollLeft\"]; })" js_scrollLeft ::
         JSElement -> IO Double
+#endif
 
 scrollTop :: (MonadIO m) => JSElement -> m Double
 scrollTop e = liftIO $ js_scrollTop e
@@ -1178,29 +1614,49 @@ jstrScrollBehavior behavior =
     ScrollSmooth  -> "smooth"
     ScrollAuto    -> "auto"
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"scrollTo\"]({top: $2, left: $3, behavior: $4})" js_scrollTo ::
+    JSVal -> Double -> Double -> JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4) => a1[\"scrollTo\"]({top: a2, left: a3, behavior: a4}))" js_scrollTo ::
     JSVal -> Double -> Double -> JSString -> IO ()
+#endif
 
 scrollTo :: (MonadIO m, Scrollable obj) => obj -> Double -> Double -> ScrollBehavior -> m ()
 scrollTo obj top left behavior =
   liftIO $ js_scrollTo (pToJSVal obj) top left (jstrScrollBehavior behavior)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"scrollBy\"]({top: $2, left: $3, behavior: $4})" js_scrollBy ::
+    JSVal -> Double -> Double -> JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4) => a1[\"scrollBy\"]({top: a2, left: a3, behavior: a4}))" js_scrollBy ::
     JSVal -> Double -> Double -> JSString -> IO ()
+#endif
 
 scrollBy :: (MonadIO m, Scrollable obj) => obj -> Double -> Double -> ScrollBehavior -> m ()
 scrollBy obj top left behavior =
   liftIO $ js_scrollBy (pToJSVal obj) top left (jstrScrollBehavior behavior)
 
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"scrollWidth\"]"
+  js_scrollWidth :: JSElement -> IO Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"scrollWidth\"]; })"
   js_scrollWidth :: JSElement -> IO Double
+#endif
 
 scrollWidth :: (MonadIO m) => JSElement -> m Double
 scrollWidth e = liftIO (js_scrollWidth e)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"scrollHeight\"]"
+  js_scrollHeight :: JSElement -> IO Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"scrollHeight\"]; })"
   js_scrollHeight :: JSElement -> IO Double
+#endif
 
 scrollHeight :: (MonadIO m) => JSElement -> m Double
 scrollHeight e = liftIO (js_scrollHeight e)
@@ -1216,49 +1672,84 @@ setCSS elem name value =
 -}
 -- * value
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"value\"]"
+        js_getValue :: JSNode -> IO JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"value\"]; })"
         js_getValue :: JSNode -> IO JSString
+#endif
 
 getValue :: (MonadIO m, IsJSNode self) => self -> m (Maybe JSString)
 getValue self
   = liftIO ((js_getValue (toJSNode self)) >>= pure . Just)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"value\"] = $2"
+        js_setValue :: JSNode -> JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"value\"] = a2)"
         js_setValue :: JSNode -> JSString -> IO ()
+#endif
 
 setValue :: (MonadIO m, IsJSNode self) => self -> Text -> m ()
 setValue self str =
     liftIO (js_setValue (toJSNode self) (textToJSString str))
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"hasFocus\"]()"
+        js_hasFocus :: JSDocument -> IO Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"hasFocus\"](); })"
         js_hasFocus :: JSDocument -> IO Bool
+#endif
 
 hasFocus :: (MonadIO m) => JSDocument -> m Bool
 hasFocus doc = liftIO (js_hasFocus doc)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"matches\"]($2)"
+        js_matches :: JSElement -> JSString -> IO Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"matches\"](a2); })"
         js_matches :: JSElement -> JSString -> IO Bool
+#endif
 
 matches :: (MonadIO m) => JSElement -> Text -> m Bool
 matches e selectorStr = liftIO $ (js_matches e (textToJSString selectorStr))
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"activeElement\"]"
+        js_getActiveElement :: JSDocument -> IO JSElement
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"activeElement\"]; })"
         js_getActiveElement :: JSDocument -> IO JSElement
+#endif
 
 getActiveElement :: (MonadIO m) => JSDocument -> m JSElement
 getActiveElement d = liftIO (js_getActiveElement d)
 
 -- * dataset
 
+#if __GHCJS__
+foreign import javascript unsafe
+  "$1.data" js_getData :: ImageData -> Uint8ClampedArray
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return (a1[\"dataset\"][a2]); })"
         js_getData :: JSNode -> JSString -> IO (Nullable JSString)
+#endif
 
 getData :: (MonadIO m, IsJSNode self) => self -> JSString -> m (Maybe JSString)
 getData self name = liftIO (nullableToMaybe <$> js_getData (toJSNode self) name)
 --getData self name = liftIO (fmap fromJSVal <$> maybeJSNullOrUndefined <$> (js_getData (toJSNode self) name))
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"dataset\"][$2] = $3"
+        js_setData :: JSNode -> JSString -> JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"dataset\"][a2] = a3)"
         js_setData :: JSNode -> JSString -> JSString -> IO ()
+#endif
 
 setData :: (MonadIO m, IsJSNode self) => self -> JSString -> JSString -> m ()
 setData self name value = liftIO (js_setData (toJSNode self) name value)
@@ -1290,8 +1781,13 @@ data ShadowRootMode
   | ClosedRoot
     deriving (Eq, Ord, Read, Show, Enum)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"attachShadow\"]({mode: $2, delegatesFocus: $3})"
+        js_attachShadow :: JSElement -> JSString -> Bool -> IO JSShadowRoot
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => { return (a1[\"attachShadow\"]({mode: a2, delegatesFocus: a3})); })"
         js_attachShadow :: JSElement -> JSString -> Bool -> IO JSShadowRoot
+#endif
 
 attachShadow :: (MonadIO m) =>
                 JSElement
@@ -1329,29 +1825,49 @@ instance PToJSVal JSTextNode where
 instance IsJSNode JSTextNode where
     toJSNode = JSNode . unJSTextNode
 
+#if __GHCJS__
+foreign import javascript unsafe "$1 instanceof Text"
+  js_instanceOfText :: JSVal -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return (a1 instanceof Text); })"
   js_instanceOfText :: JSVal -> Bool
+#endif
 
 instance InstanceOf JSTextNode where
   instanceOf a = js_instanceOfText (pToJSVal a)
 
 -- * isEqualNode
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"isEqualNode\"]($2)"
+  js_isEqualNode :: JSNode -> JSNode -> IO Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"isEqualNode\"](a2); })"
   js_isEqualNode :: JSNode -> JSNode -> IO Bool
+#endif
 
 isEqualNode :: (MonadIO m) => (IsJSNode obj1, IsJSNode obj2) => obj1 -> obj2 -> m Bool
 isEqualNode obj1 obj2 = liftIO $ js_isEqualNode (toJSNode obj1) (toJSNode obj2)
 
 -- * createTextNode
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"createTextNode\"]($2)"
+        js_createTextNode :: JSDocument -> JSString -> IO JSTextNode
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"createTextNode\"](a2); })"
         js_createTextNode :: JSDocument -> JSString -> IO JSTextNode
+#endif
 
 -- * TextNode length
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"length\"]"
+        js_textNodeLength :: JSTextNode -> IO Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"length\"]; })"
         js_textNodeLength :: JSTextNode -> IO Int
+#endif
 
 textNodeLength :: (MonadIO m) => JSTextNode -> m Int
 textNodeLength tn = liftIO (js_textNodeLength tn)
@@ -1364,15 +1880,25 @@ createJSTextNode document data'
           (textToJSString data'))
          >>= return . Just)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"nodeValue\"]"
+  js_nodeValue :: JSNode -> IO JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"nodeValue\"]; })"
   js_nodeValue :: JSNode -> IO JSString
+#endif
 
 nodeValue :: (MonadIO m) => JSNode -> m JSString
 nodeValue node = liftIO $ js_nodeValue node
 
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"nodeValue\"] = $2"
+  js_setNodeValue :: JSNode -> JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"nodeValue\"] = a2)"
   js_setNodeValue :: JSNode -> JSString -> IO ()
+#endif
 
 setNodeValue :: (MonadIO m) => JSNode -> JSString -> m ()
 setNodeValue node val = liftIO $ js_setNodeValue node val
@@ -1737,26 +2263,51 @@ instance IsEventObject (InputEventObject ev) where
   type Ev (InputEventObject ev) = ev
   asEventObject (InputEventObject jsval) = EventObject jsval
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"data\"]" js_inputData ::
+        InputEventObject ev -> Nullable JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"data\"]; })" js_inputData ::
         InputEventObject ev -> Nullable JSString
+#endif
 
 inputData :: InputEventObject ev -> Maybe JSString
 inputData ev = nullableToMaybe (js_inputData ev)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"dataTransfer\"]" js_inputDataTransfer ::
+        InputEventObject ev -> Nullable DataTransfer
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"dataTransfer\"]; })" js_inputDataTransfer ::
         InputEventObject ev -> Nullable DataTransfer
+#endif
 
 inputDataTransfer :: InputEventObject ev -> Maybe DataTransfer
 inputDataTransfer ev = nullableToMaybe (js_inputDataTransfer ev)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"inputType\"]" inputType ::
+        InputEventObject ev -> JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"inputType\"]; })" inputType ::
         InputEventObject ev -> JSString
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"isComposing\"]" isComposing ::
+        InputEventObject ev -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"isComposing\"]; })" isComposing ::
         InputEventObject ev -> Bool
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"getTargetRanges\"]()" js_getTargetRanges ::
+        InputEventObject ev -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return (a1[\"getTargetRanges\"]()); })" js_getTargetRanges ::
         InputEventObject ev -> IO JSVal
+#endif
 
 getTargetRanges :: (MonadIO m) => InputEventObject ev -> m [Range]
 getTargetRanges ieo = liftIO ((js_getTargetRanges ieo) >>= fromJSValUnchecked)
@@ -1977,26 +2528,46 @@ instance IsEventObject (StorageEventObject ev) where
   asEventObject (StorageEventObject jsval) = EventObject jsval
 
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"key\"]" js_key ::
+  StorageEventObject ev -> Nullable JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"key\"]; })" js_key ::
   StorageEventObject ev -> Nullable JSString
+#endif
 
 key :: StorageEventObject ev -> Maybe JSString
 key e = nullableToMaybe (js_key e)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"newValue\"]" js_newValue ::
+  StorageEventObject ev -> Nullable JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"newValue\"]; })" js_newValue ::
   StorageEventObject ev -> Nullable JSString
+#endif
 
 newValue :: StorageEventObject ev -> Maybe JSString
 newValue e = nullableToMaybe (js_newValue e)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"oldValue\"]" js_oldValue ::
+  StorageEventObject ev -> Nullable JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"oldValue\"]; })" js_oldValue ::
   StorageEventObject ev -> Nullable JSString
+#endif
 
 oldValue :: StorageEventObject ev -> Maybe JSString
 oldValue e = nullableToMaybe (js_oldValue e)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"url\"]" js_url ::
+  StorageEventObject ev -> JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"url\"]; })" js_url ::
   StorageEventObject ev -> JSString
+#endif
 
 url :: StorageEventObject ev -> JSString
 url e = js_url e
@@ -2060,32 +2631,57 @@ instance IsEventObject (EventObject ev) where
 
 -- * methods
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"defaultPrevented\"]" js_defaultPrevented ::
+        EventObject ev -> IO Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"defaultPrevented\"]; })" js_defaultPrevented ::
         EventObject ev -> IO Bool
+#endif
 
 defaultPrevented :: (IsEventObject obj, MonadIO m) => obj -> m Bool
 defaultPrevented obj = liftIO (js_defaultPrevented (asEventObject obj))
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"currentTarget\"]" js_currentTarget ::
+        EventObject ev -> EventTarget
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"currentTarget\"]; })" js_currentTarget ::
         EventObject ev -> EventTarget
+#endif
 
 currentTarget :: (IsEventObject obj) => obj -> EventTarget
 currentTarget obj = js_currentTarget (asEventObject obj)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"target\"]" js_target ::
+        EventObject ev -> EventTarget
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"target\"]})" js_target ::
         EventObject ev -> EventTarget
+#endif
 
 target :: (IsEventObject obj) => obj -> EventTarget
 target obj = js_target (asEventObject obj)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"preventDefault\"]()" js_preventDefault ::
+        EventObject ev -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"preventDefault\"]())" js_preventDefault ::
         EventObject ev -> IO ()
+#endif
 
 preventDefault :: (IsEventObject obj) => obj -> IO ()
 preventDefault obj = (js_preventDefault (asEventObject obj))
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"stopPropagation\"]()" js_stopPropagation ::
+        EventObject ev -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"stopPropagation\"]())" js_stopPropagation ::
         EventObject ev -> IO ()
+#endif
 
 -- stopPropagation :: (IsEventObject obj, MonadIO m) => obj -> m ()
 stopPropagation :: (IsEventObject obj) => obj -> IO ()
@@ -2116,26 +2712,61 @@ class IsMouseEventObject obj where
 instance IsMouseEventObject (MouseEventObject ev) where
   asMouseEventObject (MouseEventObject jsval) = (MouseEventObject jsval)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"clientX\"]" clientX ::
+        MouseEventObject ev -> Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"clientX\"]; })" clientX ::
         MouseEventObject ev -> Double
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"clientY\"]" clientY ::
+        MouseEventObject ev -> Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"clientY\"]; })" clientY ::
         MouseEventObject ev -> Double
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"button\"]" button ::
+        MouseEventObject ev -> Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"button\"]; })" button ::
         MouseEventObject ev -> Int
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"shiftKey\"]" mouse_shiftKey ::
+        MouseEventObject ev -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"shiftKey\"]; })" mouse_shiftKey ::
         MouseEventObject ev -> Bool
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"ctrlKey\"]" mouse_ctrlKey ::
+        MouseEventObject ev -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"ctrlKey\"]; })" mouse_ctrlKey ::
         MouseEventObject ev -> Bool
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"altKey\"]" mouse_altKey ::
+        MouseEventObject ev -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"altKey\"]; })" mouse_altKey ::
         MouseEventObject ev -> Bool
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"metaKey\"]" mouse_metaKey ::
+        MouseEventObject ev -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"metaKey\"]; })" mouse_metaKey ::
         MouseEventObject ev -> Bool
+#endif
 
 instance HasModifierKeys (MouseEventObject ev) where
   shiftKey = mouse_shiftKey
@@ -2199,17 +2830,37 @@ instance IsEventObject (KeyboardEventObject ev) where
   type Ev (KeyboardEventObject ev) = ev
   asEventObject (KeyboardEventObject jsval) = EventObject jsval
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"charCode\"]" charCode ::
+        (KeyboardEventObject ev) -> Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"charCode\"]; })" charCode ::
         (KeyboardEventObject ev) -> Int
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"keyCode\"]" keyCode ::
+        (KeyboardEventObject ev) -> Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"keyCode\"]; })" keyCode ::
         (KeyboardEventObject ev) -> Int
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"which\"]" which ::
+        (KeyboardEventObject ev) -> Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"which\"]; })" which ::
         (KeyboardEventObject ev) -> Int
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"repeat\"]" repeat ::
+        (KeyboardEventObject ev) -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"repeat\"]; })" repeat ::
         (KeyboardEventObject ev) -> Bool
+#endif
 
 class HasModifierKeys obj where
   shiftKey :: obj -> Bool
@@ -2217,17 +2868,37 @@ class HasModifierKeys obj where
   altKey   :: obj -> Bool
   metaKey  :: obj -> Bool
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"shiftKey\"]" keyboard_shiftKey ::
+        (KeyboardEventObject ev) -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"shiftKey\"]; })" keyboard_shiftKey ::
         (KeyboardEventObject ev) -> Bool
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"ctrlKey\"]" keyboard_ctrlKey ::
+        (KeyboardEventObject ev) -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"ctrlKey\"]; })" keyboard_ctrlKey ::
         (KeyboardEventObject ev) -> Bool
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"altKey\"]" keyboard_altKey ::
+        (KeyboardEventObject ev) -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"altKey\"]; })" keyboard_altKey ::
         (KeyboardEventObject ev) -> Bool
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"metaKey\"]" keyboard_metaKey ::
+        (KeyboardEventObject ev) -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"metaKey\"]; })" keyboard_metaKey ::
         (KeyboardEventObject ev) -> Bool
+#endif
 
 instance HasModifierKeys (KeyboardEventObject ev) where
   shiftKey = keyboard_shiftKey
@@ -2301,8 +2972,13 @@ instance IsEventObject (FocusEventObject ev) where
   type Ev (FocusEventObject ev) = ev
   asEventObject (FocusEventObject jsval) = EventObject jsval
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"relatedTarget\"]" js_relatedTarget ::
+        FocusEventObject ev -> Nullable JSElement
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"relatedTarget\"]; })" js_relatedTarget ::
         FocusEventObject ev -> Nullable JSElement
+#endif
 
 relatedTarget :: FocusEventObject ev -> Maybe JSElement
 relatedTarget = nullableToMaybe . js_relatedTarget
@@ -2398,8 +3074,13 @@ instance IsEventObject (CustomEventObject ev detail) where
   type Ev (CustomEventObject ev detail) = ev
   asEventObject (CustomEventObject jsval) = EventObject jsval
 
+#if __GHCJS__
+foreign import javascript unsafe "new CustomEvent($1, { 'detail': $2, 'bubbles' : $3, 'cancelable' : $4})"
+        js_newCustomEvent :: JSString -> JSVal -> Bool -> Bool -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4) => { return (new CustomEvent(a1, { 'detail': a2, 'bubbles' : a3, 'cancelable' : a4})); })"
         js_newCustomEvent :: JSString -> JSVal -> Bool -> Bool -> IO JSVal
+#endif
 
 newCustomEventWithDetail :: (KnownSymbol (UniqEventName ev), FromJSVal (CustomEventDetail ev), ToJSVal (CustomEventDetail ev)) => EventName ev -> (CustomEventDetail ev) -> Bool -> Bool -> IO (CustomEventObject ev detail)
 newCustomEventWithDetail ev detail bubbles cancelable =
@@ -2414,8 +3095,13 @@ newCustomEventNoDetail ev bubbles cancelable =
      jsval <- js_newCustomEvent evStr jsNull bubbles cancelable
      pure $ CustomEventObject jsval
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"detail\"]"
+        js_detail :: CustomEventObject e detail -> JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"detail\"]; })"
         js_detail :: CustomEventObject e detail -> JSVal
+#endif
 
 detail :: (FromJSVal detail) => CustomEventObject e detail -> IO (Maybe detail)
 detail ceo = fromJSVal $ js_detail ceo
@@ -2429,8 +3115,13 @@ type family CustomEventDetail (ev :: k) = detail
 -- * addEventListener
 
 -- FIXME: Element is overly restrictive
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"addEventListener\"]($2, $3,\n$4)"
+   js_addEventListener :: EventTarget -> JSString -> Callback (JSVal -> IO ()) -> Bool -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4) => a1[\"addEventListener\"](a2,a3,a4))"
    js_addEventListener :: EventTarget -> JSString -> Callback (JSVal -> IO ()) -> Bool -> IO ()
+#endif
 
 addEventListener :: forall m self k eventName. (MonadIO m, IsEventTarget self, KnownSymbol (UniqEventName (eventName :: k)), FromJSVal (EventObjectOf eventName)) =>
                   self
@@ -2450,8 +3141,13 @@ addEventListener self event callback useCapture = liftIO $
 -- * addEventListener
 
 -- FIXME: Element is overly restrictive
+#if __GHCJS__
+foreign import javascript unsafe "$1['addEventListener']($2, $3,{'capture':$4,'once':$5,'passive':$6})"
+   js_addEventListenerOpt :: EventTarget -> JSString -> Callback (JSVal -> IO ()) -> Bool -> Bool -> Bool -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4,a5,a6) => a1['addEventListener'](a2, a3,{'capture':a4,'once':a5,'passive':a6}))"
    js_addEventListenerOpt :: EventTarget -> JSString -> Callback (JSVal -> IO ()) -> Bool -> Bool -> Bool -> IO ()
+#endif
 
 addEventListenerOpt :: forall m self k eventName. (MonadIO m, IsEventTarget self, KnownSymbol (UniqEventName (eventName :: k)), FromJSVal (EventObjectOf eventName)) =>
                   self
@@ -2468,8 +3164,13 @@ addEventListenerOpt self event callback (capture,once,passive) = liftIO $
          do (Just eventObject) <- fromJSVal ev
             callback eventObject
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"dispatchEvent\"]($2)"
+  js_dispatchEvent :: EventTarget -> EventObject ev -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"dispatchEvent\"](a2); })"
   js_dispatchEvent :: EventTarget -> EventObject ev -> IO ()
+#endif
 
 dispatchEvent :: (MonadIO m, IsEventTarget eventTarget, IsEventObject eventObj) => eventTarget -> eventObj -> m ()
 dispatchEvent et ev = liftIO $ js_dispatchEvent (toEventTarget et) (asEventObject ev)
@@ -2482,26 +3183,61 @@ instance PFromJSVal DOMClientRect where
   pFromJSVal = DOMClientRect
   {-# INLINE pFromJSVal #-}
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"width\"]" width ::
+         Image -> Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"width\"]; })" width ::
          DOMClientRect -> Double
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"top\"]" rectTop ::
+         DOMClientRect -> Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"top\"]; })" rectTop ::
          DOMClientRect -> Double
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"left\"]" rectLeft ::
+         DOMClientRect -> Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"left\"]; })" rectLeft ::
          DOMClientRect -> Double
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"right\"]" rectRight ::
+         DOMClientRect -> Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"right\"]; })" rectRight ::
          DOMClientRect -> Double
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"bottom\"]" rectBottom ::
+         DOMClientRect -> Double
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"bottom\"]; })" rectBottom ::
          DOMClientRect -> Double
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"height\"]" height ::
+         Image -> Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"height\"]; })" height ::
          DOMClientRect -> Double
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"getBoundingClientRect\"]()" js_getBoundingClientRect ::
+  JSElement -> IO DOMClientRect
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"getBoundingClientRect\"](); })" js_getBoundingClientRect ::
   JSElement -> IO DOMClientRect
+#endif
 
 getBoundingClientRect :: (MonadIO m) => JSElement -> m DOMClientRect
 getBoundingClientRect = liftIO . js_getBoundingClientRect
@@ -2515,16 +3251,26 @@ instance Show DOMClientRect where
 -- * offsetWidth
 
 -- https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetWidth
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"offsetWidth\"]" js_offsetWidth ::
+  JSElement -> IO Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"offsetWidth\"]; })" js_offsetWidth ::
   JSElement -> IO Int
+#endif
 
 offsetWidth :: (MonadIO m) => JSElement -> m Int
 offsetWidth = liftIO . js_offsetWidth
 
 -- * ArrayBuffer <=> ByteString
 
+#if __GHCJS__
+foreign import javascript unsafe "$3.slice($1, $1 + $2)"
+  js_bufferSlice :: Int -> Int -> ArrayBuffer -> ArrayBuffer
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => { return a3.slice(a1, a1 + a2); })"
   js_bufferSlice :: Int -> Int -> ArrayBuffer -> ArrayBuffer
+#endif
 
 byteStringToArrayBuffer :: BS.ByteString -> ArrayBuffer
 byteStringToArrayBuffer bs =
@@ -2544,8 +3290,13 @@ instance Eq (XMLHttpRequest) where
 instance IsEventTarget XMLHttpRequest where
     toEventTarget = EventTarget . unXMLHttpRequest
 
+#if __GHCJS__
+foreign import javascript unsafe "$1 instanceof XMLHttpRequest"
+  js_instanceOfXMLHttpRequest :: JSVal -> Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return (a1 instanceof XMLHttpRequest); })"
   js_instanceOfXMLHttpRequest :: JSVal -> Bool
+#endif
 
 instance InstanceOf XMLHttpRequest where
   instanceOf a = js_instanceOfXMLHttpRequest (pToJSVal a)
@@ -2558,18 +3309,30 @@ instance FromJSVal XMLHttpRequest where
   fromJSVal = return . fmap XMLHttpRequest . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
+#if __GHCJS__
+foreign import javascript unsafe "new window[\"XMLHttpRequest\"]()"
+        js_newXMLHttpRequest :: IO XMLHttpRequest
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "(() => { return (new window[\"XMLHttpRequest\"]()); })"
         js_newXMLHttpRequest :: IO XMLHttpRequest
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest Mozilla XMLHttpRequest documentation>
 newXMLHttpRequest :: (MonadIO m) => m XMLHttpRequest
 newXMLHttpRequest
   = liftIO js_newXMLHttpRequest
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"open\"]($2, $3, $4)"
+        js_open ::
+        XMLHttpRequest ->
+          JSString -> JSString -> Bool -> {- JSString -> JSString -> -} IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4) => a1[\"open\"](a2, a3, a4))"
         js_open ::
         XMLHttpRequest ->
           JSString -> JSString -> Bool -> {- JSString -> JSString -> -} IO ()
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest.open Mozilla XMLHttpRequest.open documentation>
 open ::
@@ -2578,12 +3341,21 @@ open ::
 open self method url async
   = liftIO (js_open self (textToJSString method) (textToJSString url) async)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"setRequestHeader\"]($2,$3)"
+        js_setRequestHeader
+            :: XMLHttpRequest
+            -> JSString
+            -> JSString
+            -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"setRequestHeader\"](a2,a3))"
         js_setRequestHeader
             :: XMLHttpRequest
             -> JSString
             -> JSString
             -> IO ()
+#endif
 
 setRequestHeader :: (MonadIO m) =>
                     XMLHttpRequest
@@ -2600,24 +3372,39 @@ send :: (MonadIO m) => XMLHttpRequest -> m ()
 send self = liftIO $ js_send (unXMLHttpRequest self) jsNull >> return () -- >>= throwXHRError
 -}
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"send\"]()" js_send ::
+        XMLHttpRequest -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((r) => r[\"send\"]())" js_send ::
         XMLHttpRequest -> IO ()
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest#send() Mozilla XMLHttpRequest.send documentation>
 send :: (MonadIO m) => XMLHttpRequest -> m ()
 send self =
     liftIO $ js_send self >> return () -- >>= throwXHRError
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"send\"]($2)" js_sendString ::
+        XMLHttpRequest -> JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((r,v) => r[\"send\"](v))" js_sendString ::
         XMLHttpRequest -> JSString -> IO ()
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest#send() Mozilla XMLHttpRequest.send documentation>
 sendString :: (MonadIO m) => XMLHttpRequest -> JSString -> m ()
 sendString self str =
     liftIO $ js_sendString self str >> return () -- >>= throwXHRError
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"send\"]($2)" js_sendArrayBuffer ::
+        XMLHttpRequest -> ArrayBuffer -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((r,v) => r[\"send\"](v))" js_sendArrayBuffer ::
         XMLHttpRequest -> ArrayBuffer -> IO ()
+#endif
 
 sendArrayBuffer :: (MonadIO m) => XMLHttpRequest -> ArrayBuffer -> m ()
 sendArrayBuffer xhr buf =
@@ -2626,22 +3413,40 @@ sendArrayBuffer xhr buf =
     liftIO $ do ref <- fmap (pToJSVal . getArrayBuffer) (ArrayBuffer.thaw buf)
                 js_sendArrayBuffer xhr ref
 -}
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"send\"]($2)" js_sendData ::
+        XMLHttpRequest
+    -> JSVal
+    -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((r,v) => r[\"send\"](v))" js_sendData ::
         XMLHttpRequest
     -> JSVal
     -> IO ()
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"readyState\"]"
+        js_getReadyState :: XMLHttpRequest -> IO Word
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"readyState\"]; })"
         js_getReadyState :: XMLHttpRequest -> IO Word
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest.readyState Mozilla XMLHttpRequest.readyState documentation>
 getReadyState :: (MonadIO m) => XMLHttpRequest -> m Word
 getReadyState self
   = liftIO (js_getReadyState self)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"responseType\"]"
+        js_getResponseType ::
+        XMLHttpRequest -> IO JSString -- XMLHttpRequestResponseType
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"responseType\"]; })"
         js_getResponseType ::
         XMLHttpRequest -> IO JSString -- XMLHttpRequestResponseType
+#endif
 
 -- | <Https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest.responseType Mozilla XMLHttpRequest.responseType documentation>
 getResponseType ::
@@ -2649,9 +3454,15 @@ getResponseType ::
 getResponseType self
   = liftIO (textFromJSString <$> js_getResponseType self)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"responseType\"] = $2"
+        js_setResponseType ::
+        XMLHttpRequest -> JSString -> IO () -- XMLHttpRequestResponseType
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"responseType\"] = a2)"
         js_setResponseType ::
         XMLHttpRequest -> JSString -> IO () -- XMLHttpRequestResponseType
+#endif
 
 setResponseType :: (MonadIO m) =>
                    XMLHttpRequest
@@ -2666,28 +3477,63 @@ data XMLHttpRequestResponseType = XMLHttpRequestResponseType
                                 | XMLHttpRequestResponseTypeDocument
                                 | XMLHttpRequestResponseTypeJson
                                 | XMLHttpRequestResponseTypeText
+#if __GHCJS__
+foreign import javascript unsafe "\"\""
+        js_XMLHttpRequestResponseType :: JSVal -- XMLHttpRequestResponseType
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "(() => { return \"\"; })"
         js_XMLHttpRequestResponseType :: JSVal -- XMLHttpRequestResponseType
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "\"arraybuffer\""
+        js_XMLHttpRequestResponseTypeArraybuffer ::
+        JSVal -- XMLHttpRequestResponseType
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "(() => { return \"arraybuffer\"; })"
         js_XMLHttpRequestResponseTypeArraybuffer ::
         JSVal -- XMLHttpRequestResponseType
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "\"blob\""
+        js_XMLHttpRequestResponseTypeBlob ::
+        JSVal -- XMLHttpRequestResponseType
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "(() => { return \"blob\"; })"
         js_XMLHttpRequestResponseTypeBlob ::
         JSVal -- XMLHttpRequestResponseType
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "\"document\""
+        js_XMLHttpRequestResponseTypeDocument ::
+        JSVal -- XMLHttpRequestResponseType
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "(() => { return \"document\"; })"
         js_XMLHttpRequestResponseTypeDocument ::
         JSVal -- XMLHttpRequestResponseType
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "\"json\""
+        js_XMLHttpRequestResponseTypeJson ::
+        JSVal -- XMLHttpRequestResponseType
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "(() => { return \"json\"; })"
         js_XMLHttpRequestResponseTypeJson ::
         JSVal -- XMLHttpRequestResponseType
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "\"text\""
+        js_XMLHttpRequestResponseTypeText ::
+        JSVal -- XMLHttpRequestResponseType
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "(() => { return \"text\"; })"
         js_XMLHttpRequestResponseTypeText ::
         JSVal -- XMLHttpRequestResponseType
+#endif
 
 
 instance ToJSVal XMLHttpRequestResponseType where
@@ -2721,9 +3567,15 @@ instance FromJSVal XMLHttpRequestResponseType where
                 return (Just XMLHttpRequestResponseTypeText)
             | otherwise = error "instance FromJSVal XMLHttpRequestResponseType"
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"response\"]" js_getResponse
+        :: XMLHttpRequest
+        -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"response\"]; })" js_getResponse
         :: XMLHttpRequest
         -> IO JSVal
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest.response Mozilla XMLHttpRequest.response documentation>
 getResponse :: (MonadIO m) =>
@@ -2732,8 +3584,13 @@ getResponse :: (MonadIO m) =>
 getResponse self =
     liftIO (js_getResponse self)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"responseText\"]"
+        js_getResponseText :: XMLHttpRequest -> IO JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"responseText\"]; })"
         js_getResponseText :: XMLHttpRequest -> IO JSString
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest.responseText Mozilla XMLHttpRequest.responseText documentation>
 getResponseText ::
@@ -2754,15 +3611,25 @@ getResponseByteString self
                pure $ Just $ byteStringFromArrayBuffer ab
        else do pure Nothing
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"status\"]" js_getStatus ::
+        XMLHttpRequest -> IO Word
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"status\"]; })" js_getStatus ::
         XMLHttpRequest -> IO Word
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest.status Mozilla XMLHttpRequest.status documentation>
 getStatus :: (MonadIO m) => XMLHttpRequest -> m Word
 getStatus self = liftIO (js_getStatus self)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"statusText\"]"
+        js_getStatusText :: XMLHttpRequest -> IO JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"statusText\"]; })"
         js_getStatusText :: XMLHttpRequest -> IO JSString
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest.statusText Mozilla XMLHttpRequest.statusText documentation>
 getStatusText ::
@@ -2771,8 +3638,13 @@ getStatusText self
   = liftIO
       (textFromJSString <$> js_getStatusText self)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"responseURL\"]"
+        js_getResponseURL :: XMLHttpRequest -> IO JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"responseURL\"]; })"
         js_getResponseURL :: XMLHttpRequest -> IO JSString
+#endif
 
 
 -- * WebSocket
@@ -2845,8 +3717,13 @@ instance IsEventObject (DragEventObject ev) where
 instance IsMouseEventObject (DragEventObject ev) where
   asMouseEventObject (DragEventObject jsval) = (MouseEventObject jsval)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"dataTransfer\"]" js_dataTransfer ::
+        DragEventObject ev -> Nullable DataTransfer
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"dataTransfer\"]; })" js_dataTransfer ::
         DragEventObject ev -> Nullable DataTransfer
+#endif
 
 dataTransfer :: DragEventObject ev -> Maybe DataTransfer
 dataTransfer ev = nullableToMaybe (js_dataTransfer ev)
@@ -2865,8 +3742,13 @@ instance FromJSVal Selection where
 
 -- ** Properties
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"rangeCount\"]"
+        js_getRangeCount :: Selection -> IO Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"rangeCount\"]; })"
         js_getRangeCount :: Selection -> IO Int
+#endif
 
 getRangeCount :: (MonadIO m) => Selection -> m Int
 getRangeCount selection = liftIO (js_getRangeCount selection)
@@ -2876,93 +3758,168 @@ rangeCount = getRangeCount
 
 -- ** methods
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"addRange\"]($2)"
+  js_addRange :: Selection -> Range -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"addRange\"](a2))"
   js_addRange :: Selection -> Range -> IO ()
+#endif
 
 addRange :: (MonadIO m) => Selection -> Range -> m ()
 addRange selection range = liftIO $ (js_addRange selection range)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"anchorNode\"]"
+  js_anchorNode :: Selection -> IO JSNode
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"anchorNode\"]; })"
   js_anchorNode :: Selection -> IO JSNode
+#endif
 
 anchorNode :: (MonadIO m) => Selection -> m JSNode
 anchorNode s = liftIO (js_anchorNode s)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"anchorOffset\"]"
+  js_anchorOffset :: Selection -> IO Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"anchorOffset\"]; })"
   js_anchorOffset :: Selection -> IO Int
+#endif
 
 anchorOffset :: (MonadIO m) => Selection -> m Int
 anchorOffset s = liftIO (js_anchorOffset s)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"focusNode\"]"
+  js_focusNode :: Selection -> IO JSNode
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"focusNode\"]; })"
   js_focusNode :: Selection -> IO JSNode
+#endif
 
 focusNode :: (MonadIO m) => Selection -> m JSNode
 focusNode s = liftIO (js_focusNode s)
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"focusOffset\"]"
+  js_focusOffset :: Selection -> IO Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"focusOffset\"]; })"
   js_focusOffset :: Selection -> IO Int
+#endif
 
 focusOffset :: (MonadIO m) => Selection -> m Int
 focusOffset s = liftIO (js_focusOffset s)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"collapse\"]($2, $3)"
+  js_collapse :: Selection -> JSNode -> Int -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"collapse\"](a2, a3))"
   js_collapse :: Selection -> JSNode -> Int -> IO ()
+#endif
 
 collapse :: (MonadIO m) => Selection -> Maybe JSNode -> Maybe Int -> m ()
 collapse sel mNode mOffset = liftIO $ js_collapse sel (fromMaybe (JSNode jsNull) mNode) (fromMaybe 0 mOffset)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"collapseToStart\"]()"
+  js_collapseToStart :: Selection -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"collapseToStart\"]())"
   js_collapseToStart :: Selection -> IO ()
+#endif
 
 collapseToStart :: (MonadIO m) => Selection -> m ()
 collapseToStart s = liftIO (js_collapseToStart s)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"collapseToEnd\"]()"
+  js_collapseToEnd :: Selection -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"collapseToEnd\"]())"
   js_collapseToEnd :: Selection -> IO ()
+#endif
 
 collapseToEnd :: (MonadIO m) => Selection -> m ()
 collapseToEnd s = liftIO (js_collapseToEnd s)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"deleteFromDocument\"]()"
+  js_deleteFromDocument :: Selection -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"deleteFromDocument\"]())"
   js_deleteFromDocument :: Selection -> IO ()
+#endif
 
 deleteFromDocument :: (MonadIO m) => Selection -> m ()
 deleteFromDocument sel = liftIO $ js_deleteFromDocument sel
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"isCollapsed\"]"
+  js_isCollapsed :: Selection -> IO Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"isCollapsed\"]; })"
   js_isCollapsed :: Selection -> IO Bool
+#endif
 
 isCollapsed :: (MonadIO m) => Selection -> m Bool
 isCollapsed sel = liftIO $ js_isCollapsed sel
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"getRangeAt\"]($2)"
+        js_getRangeAt :: Selection -> Int -> IO Range
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"getRangeAt\"](a2); })"
         js_getRangeAt :: Selection -> Int -> IO Range
+#endif
 
 getRangeAt :: (MonadIO m) => Selection -> Int -> m Range
 getRangeAt selection index = liftIO (js_getRangeAt selection index)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"removeAllRanges\"]()"
+  js_removeAllRanges :: Selection -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"removeAllRanges\"]())"
   js_removeAllRanges :: Selection -> IO ()
+#endif
 
 removeAllRanges :: (MonadIO m) => Selection -> m ()
 removeAllRanges s = liftIO $ js_removeAllRanges s
 
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"setBaseAndExtent\"]($2, $3, $4, $5)"
+  js_setBaseAndExtent :: Selection -> JSNode -> Int -> JSNode -> Int -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2, a3, a4, a5) => a1[\"setBaseAndExtent\"](a2, a3, a4, a5))"
   js_setBaseAndExtent :: Selection -> JSNode -> Int -> JSNode -> Int -> IO ()
+#endif
 
 setBaseAndExtent :: (MonadIO m, IsJSNode an, IsJSNode fn) => Selection -> an -> Int -> fn -> Int -> m ()
 setBaseAndExtent s an ao fn fo = liftIO $ js_setBaseAndExtent s (toJSNode an) ao (toJSNode fn) fo
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"toString\"]()"
+ js_selectionToString :: Selection -> IO JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"toString\"](); })"
  js_selectionToString :: Selection -> IO JSString
+#endif
 
 selectionToString :: (MonadIO m) => Selection -> m JSString
 selectionToString s = liftIO $ js_selectionToString s
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"containsNode\"]($2,$3)"
+ js_containsNode :: Selection -> JSNode -> Bool -> IO Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => { return a1[\"containsNode\"](a2,a3); })"
  js_containsNode :: Selection -> JSNode -> Bool -> IO Bool
+#endif
 
 containsNode :: (MonadIO m) => Selection -> JSNode -> Bool -> m Bool
 containsNode sel node partialContainment = liftIO (js_containsNode sel node partialContainment)
@@ -2987,66 +3944,121 @@ instance PToJSVal Range where
   pToJSVal (Range jsval) = jsval
   {-# INLINE pToJSVal #-}
 
+#if __GHCJS__
+foreign import javascript unsafe "new Range()"
+  js_newRange :: IO Range
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "(() => { return (new Range()); })"
   js_newRange :: IO Range
+#endif
 
 newRange :: (MonadIO m) => m Range
 newRange = liftIO js_newRange
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"cloneContents\"]()"
+  js_cloneContents :: Range -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"cloneContents\"](); })"
   js_cloneContents :: Range -> IO JSVal
+#endif
 
 cloneContents :: (MonadIO m) => Range -> m JSDocumentFragment
 cloneContents r = liftIO $ pFromJSVal <$> js_cloneContents r
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"commonAncestorContainer\"]"
+  js_commonAncestorContainer :: Range -> IO JSNode
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"commonAncestorContainer\"]; })"
   js_commonAncestorContainer :: Range -> IO JSNode
+#endif
 
 commonAncestorContainer :: (MonadIO m) => Range -> m JSNode
 commonAncestorContainer r = liftIO $ js_commonAncestorContainer r
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"deleteContents\"]()"
+  js_deleteContents :: Range -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"deleteContents\"]())"
   js_deleteContents :: Range -> IO ()
+#endif
 
 deleteContents :: (MonadIO m) => Range -> m ()
 deleteContents r = liftIO $ js_deleteContents r
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"getBoundingClientRect\"]()" js_getRangeBoundingClientRect ::
+  Range -> IO DOMClientRect
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"getBoundingClientRect\"]())" js_getRangeBoundingClientRect ::
   Range -> IO DOMClientRect
+#endif
 
 getRangeBoundingClientRect :: (MonadIO m) => Range -> m DOMClientRect
 getRangeBoundingClientRect = liftIO . js_getRangeBoundingClientRect
 
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"startContainer\"]"
+        js_startContainer :: Range -> IO JSNode
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"startContainer\"]; })"
         js_startContainer :: Range -> IO JSNode
+#endif
 {-
+#if __GHCJS__
 foreign import javascript unsafe "$[\"createRange\"]()"
   js_createRange :: JSDocument -> IO Range
+#elif defined(javascript_HOST_ARCH)
+foreign import javascript unsafe "$[\"createRange\"]()"
+  js_createRange :: JSDocument -> IO Range
+#endif
 
 createRange :: JSDocument -> IO Range
 createRange d = js_createRange d
 -}
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"selectNode\"]($2)"
+  js_selectNode :: Range -> JSNode -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"selectNode\"](a2))"
   js_selectNode :: Range -> JSNode -> IO ()
+#endif
 
 selectNode :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
 selectNode r n = liftIO (js_selectNode r (toJSNode n))
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"selectNodeContents\"]($2)"
+  js_selectNodeContents :: Range -> JSNode -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"selectNodeContents\"](a2))"
   js_selectNodeContents :: Range -> JSNode -> IO ()
+#endif
 
 selectNodeContents :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
 selectNodeContents r n = liftIO (js_selectNodeContents r (toJSNode n))
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"insertNode\"]($2)"
+  js_insertNode :: Range -> JSNode -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"insertNode\"](a2))"
   js_insertNode :: Range -> JSNode -> IO ()
+#endif
 
 insertNode :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
 insertNode r n = liftIO (js_insertNode r (toJSNode n))
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"toString\"]()"
+  js_rangeToString :: Range -> IO JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"toString\"](); })"
   js_rangeToString :: Range -> IO JSString
+#endif
 
 rangeToJSString :: Range -> IO JSString
 rangeToJSString r = liftIO (js_rangeToString r)
@@ -3054,56 +4066,101 @@ rangeToJSString r = liftIO (js_rangeToString r)
 startContainer :: (MonadIO m) => Range -> m JSNode
 startContainer r = liftIO (js_startContainer r)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"startOffset\"]"
+        js_startOffset :: Range -> IO Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"startOffset\"]; })"
         js_startOffset :: Range -> IO Int
+#endif
 
 startOffset :: (MonadIO m) => Range -> m Int
 startOffset r = liftIO (js_startOffset r)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"endContainer\"]"
+        js_endContainer :: Range -> IO JSNode
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"endContainer\"]; })"
         js_endContainer :: Range -> IO JSNode
+#endif
 
 endContainer :: (MonadIO m) => Range -> m JSNode
 endContainer r = liftIO (js_endContainer r)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"endOffset\"]"
+        js_endOffset :: Range -> IO Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"endOffset\"]; })"
         js_endOffset :: Range -> IO Int
+#endif
 
 endOffset :: (MonadIO m) => Range -> m Int
 endOffset r = liftIO (js_endOffset r)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"setStart\"]($2,$3)"
+  js_setStart :: Range -> JSNode -> Int -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"setStart\"](a2,a3))"
   js_setStart :: Range -> JSNode -> Int -> IO ()
+#endif
 
 setStart :: (MonadIO m, IsJSNode node) => Range -> node -> Int -> m ()
 setStart r n i = liftIO $ js_setStart r (toJSNode n) i
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"setStartBefore\"]($2)"
+  js_setStartBefore :: Range -> JSNode -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"setStartBefore\"](a2))"
   js_setStartBefore :: Range -> JSNode -> IO ()
+#endif
 
 setStartBefore :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
 setStartBefore r n = liftIO $ js_setStartBefore r (toJSNode n)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"setStartAfter\"]($2)"
+  js_setStartAfter :: Range -> JSNode -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"setStartAfter\"](a2))"
   js_setStartAfter :: Range -> JSNode -> IO ()
+#endif
 
 setStartAfter :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
 setStartAfter r n = liftIO $ js_setStartAfter r (toJSNode n)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"setEnd\"]($2,$3)"
+  js_setEnd :: Range -> JSNode -> Int -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"setEnd\"](a2,a3))"
   js_setEnd :: Range -> JSNode -> Int -> IO ()
+#endif
 
 setEnd :: (MonadIO m, IsJSNode node) => Range -> node -> Int -> m ()
 setEnd r n i = liftIO $ js_setEnd r (toJSNode n) i
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"setEndBefore\"]($2)"
+  js_setEndBefore :: Range -> JSNode -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"setEndBefore\"](a2))"
   js_setEndBefore :: Range -> JSNode -> IO ()
+#endif
 
 setEndBefore :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
 setEndBefore r n = liftIO $ js_setEndBefore r (toJSNode n)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"setEndAfter\"]($2)"
+  js_setEndAfter :: Range -> JSNode -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"setEndAfter\"](a2))"
   js_setEndAfter :: Range -> JSNode -> IO ()
+#endif
 
 setEndAfter :: (MonadIO m, IsJSNode node) => Range -> node -> m ()
 setEndAfter r n = liftIO $ js_setEndAfter r (toJSNode n)
@@ -3121,15 +4178,25 @@ instance FromJSVal (HTMLCollection a) where
   fromJSVal = pure . fmap HTMLCollection . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"item\"]($2)" js_collectionItem ::
+        HTMLCollection a -> Int -> IO (Nullable a)
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"item\"](a2); })" js_collectionItem ::
         HTMLCollection a -> Int -> IO (Nullable a)
+#endif
 
 collectionItem :: (MonadIO m, PFromJSVal a) => HTMLCollection a -> Int -> m (Maybe a)
 collectionItem col n =
   liftIO (nullableToMaybe <$> js_collectionItem col n)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"length\"]" js_collectionLength ::
+        HTMLCollection a -> IO Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"length\"]; })" js_collectionLength ::
         HTMLCollection a -> IO Int
+#endif
 
 collectionLength :: (MonadIO m) => HTMLCollection a -> m Int
 collectionLength col =
@@ -3155,8 +4222,13 @@ instance FromJSVal ClientRects where
   {-# INLINE fromJSVal #-}
 -}
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"getClientRects\"]()"
+  js_getClientRects :: JSVal -> IO (HTMLCollection DOMClientRect)
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"getClientRects\"](); })"
   js_getClientRects :: JSVal -> IO (HTMLCollection DOMClientRect)
+#endif
 
 getElementClientRects :: (MonadIO m) => JSElement -> m (HTMLCollection DOMClientRect)
 getElementClientRects e = liftIO $ js_getClientRects (unJSElement e)
@@ -3175,23 +4247,43 @@ instance FromJSVal ClientRect where
   fromJSVal = return . fmap ClientRect . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[$2]"
+ js_clientRectIx :: ClientRects -> Int -> IO ClientRect
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[a2]})"
  js_clientRectIx :: ClientRects -> Int -> IO ClientRect
+#endif
 
 clientRectIx :: (MonadIO m) => ClientRects -> Int -> m ClientRect
 clientRectIx crs i = liftIO $ js_clientRectIx crs i
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"length\"]"
+  clientRectsLength :: ClientRects -> Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "a1[\"length\"]"
   clientRectsLength :: ClientRects -> Int
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"left\"]"
+  crLeft :: ClientRect -> Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "a1[\"left\"]"
   crLeft :: ClientRect -> Int
+#endif
 
 -- crLeft :: (MonadIO m) => ClientRect -> m Int
 -- crLeft cr = liftIO $ js_crLeft cr
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"top\"]"
+  crTop :: ClientRect -> Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "a1[\"top\"]"
   crTop :: ClientRect -> Int
+#endif
 {-
 crTop :: (MonadIO m) => ClientRect -> m Int
 crTop cr = liftIO $ js_crTop cr
@@ -3250,8 +4342,13 @@ type Loop = forall model remote. (Show model, ToJSON remote) =>
             JSDocument -> JSNode -> model -> ((remote -> IO ()) -> TDVar model -> IO ()) ->
             Maybe JS.JSString -> ((remote -> IO ()) -> MessageEvent.MessageEvent -> TDVar model -> IO ()) -> ((remote -> IO ()) -> model -> Html model) -> IO (TDVar model)
 
+#if __GHCJS__
+foreign import javascript unsafe "window[\"setTimeout\"]($1, $2)" js_setTimeout ::
+  Callback (IO ()) -> Int -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => window[\"setTimeout\"](a1, a2))" js_setTimeout ::
   Callback (IO ()) -> Int -> IO ()
+#endif
 
 -- * DataTransfer
 
@@ -3274,8 +4371,13 @@ instance PFromJSVal DataTransfer where
 
 
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"getData\"]($2)" js_getDataTransferData ::
+        DataTransfer -> JSString -> IO JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"getData\"](a2); })" js_getDataTransferData ::
         DataTransfer -> JSString -> IO JSString
+#endif
 
 getDataTransferData :: -- (MonadIO m) =>
            DataTransfer
@@ -3283,16 +4385,26 @@ getDataTransferData :: -- (MonadIO m) =>
         -> IO JSString
 getDataTransferData dt format = (js_getDataTransferData dt format)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"setData\"]($2, $3)" js_setDataTransferData ::
+        DataTransfer -> JSString -> JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"setData\"](a2, a3))" js_setDataTransferData ::
         DataTransfer -> JSString -> JSString -> IO ()
+#endif
 
 setDataTransferData :: DataTransfer
                     -> JSString -- ^ format
                     -> JSString -- ^ data
                     -> IO ()
 setDataTransferData dataTransfer format data_ = (js_setDataTransferData dataTransfer format data_)
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"types\"]" js_getTypes ::
+        DataTransfer -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"types\"]; })" js_getTypes ::
         DataTransfer -> IO JSVal
+#endif
 
 -- | <https://developer.mozilla.org/en-US/docs/Web/API/DataTransfer.types Mozilla DataTransfer.types documentation>
 getTypes ::
@@ -3315,14 +4427,24 @@ instance FromJSVal DataTransferItem where
   fromJSVal = pure . fmap DataTransferItem . maybeJSNullOrUndefined
   {-# INLINE fromJSVal #-}
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"kind\"]()" js_dataTransferItemKind ::
+        DataTransferItem -> JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"kind\"](); })" js_dataTransferItemKind ::
         DataTransferItem -> JSString
+#endif
 
 dataTransferItemKind :: DataTransferItem -> Text
 dataTransferItemKind dti = textFromJSString $ js_dataTransferItemKind dti
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"type\"]()" js_dataTransferItemType ::
+        DataTransferItem -> JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"type\"](); })" js_dataTransferItemType ::
         DataTransferItem -> JSString
+#endif
 
 dataTransferItemType :: DataTransferItem -> Text
 dataTransferItemType dti = textFromJSString $ js_dataTransferItemType dti
@@ -3363,13 +4485,23 @@ instance IsEventObject (ClipboardEventObject ev) where
   type Ev (ClipboardEventObject ev) = ev
   asEventObject (ClipboardEventObject jsval) = EventObject jsval
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"clipboardData\"]" clipboardData ::
+        ClipboardEventObject ev -> IO DataTransfer
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"clipboardData\"]; })" clipboardData ::
         ClipboardEventObject ev -> IO DataTransfer
+#endif
 
 -- * Event
 
+#if __GHCJS__
+foreign import javascript unsafe "new Event($1, { 'bubbles' : $2, 'cancelable' : $3})"
+        js_newEvent :: JSString -> Bool -> Bool -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => { return (new Event(a1, { 'bubbles' : a2, 'cancelable' : a3})); })"
         js_newEvent :: JSString -> Bool -> Bool -> IO JSVal
+#endif
 
 class MkEvent ev where
   mkEvent :: EventName ev -> JSVal -> EventObjectOf ev
@@ -3433,14 +4565,24 @@ instance FromJSVal JSDOM where
   {-# INLINE fromJSVal #-}
 
 
+#if __GHCJS__
+foreign import javascript unsafe "require('jsdom')"
+   js_requireJSDOM :: IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "(() => { return require('jsdom'); })"
    js_requireJSDOM :: IO JSVal
+#endif
 
 requireJSDOM :: (MonadIO m) => m (Maybe JSDOM)
 requireJSDOM = liftIO $ fromJSVal =<< js_requireJSDOM
 
+#if __GHCJS__
+foreign import javascript unsafe "new $1.JSDOM($2).window"
+   js_newJSDOM :: JSDOM -> JSString -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return (new a1.JSDOM(a2).window); })"
    js_newJSDOM :: JSDOM -> JSString -> IO JSVal
+#endif
 
 newJSDOM :: (MonadIO m) => JSDOM -> JSString -> m (Maybe JSWindow)
 newJSDOM jsdom html = liftIO $ fromJSVal =<< js_newJSDOM jsdom html
@@ -3463,8 +4605,13 @@ newtype MediaElement = MediaElement { unMediaElement :: JSVal }
 asMediaElement :: JSElement -> Maybe MediaElement
 asMediaElement (JSElement v) = Just (MediaElement v)
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"srcObject\"] = $2"
+   js_setSrcObject :: MediaElement -> JSVal -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"srcObject\"] = a2)"
    js_setSrcObject :: MediaElement -> JSVal -> IO ()
+#endif
 
 setSrcObject :: (MonadIO m, IsSrcObject o) => MediaElement -> o -> m ()
 setSrcObject me o = liftIO $ js_setSrcObject me (pToJSVal o)
@@ -3485,32 +4632,57 @@ instance PFromJSVal DOMTokenList where
   pFromJSVal = DOMTokenList
   {-# INLINE pFromJSVal #-}
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"add\"]($2)"
+        js_addToken1 :: DOMTokenList -> JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"add\"](a2))"
         js_addToken1 :: DOMTokenList -> JSString -> IO ()
+#endif
 
 addToken1 :: (MonadIO m) => DOMTokenList -> JSString -> m ()
 addToken1 dtl t = liftIO $ js_addToken1 dtl t
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"remove\"]($2)"
+        js_removeToken1 :: DOMTokenList -> JSString -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"remove\"](a2))"
         js_removeToken1 :: DOMTokenList -> JSString -> IO ()
+#endif
 
 removeToken1 :: (MonadIO m) => DOMTokenList -> JSString -> m ()
 removeToken1 dtl t = liftIO $ js_removeToken1 dtl t
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"replace\"]($2)"
+        js_replaceToken :: DOMTokenList -> JSString -> JSString -> IO Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"replace\"](a2); })"
         js_replaceToken :: DOMTokenList -> JSString -> JSString -> IO Bool
+#endif
 
 replaceToken :: (MonadIO m) => DOMTokenList -> JSString -> JSString -> m Bool
 replaceToken dtl old new = liftIO $ js_replaceToken dtl old new
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"contains\"]($2)"
+        js_containsToken :: DOMTokenList -> JSString -> IO Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return a1[\"contains\"](a2); })"
         js_containsToken :: DOMTokenList -> JSString -> IO Bool
+#endif
 
 containsToken :: (MonadIO m) => DOMTokenList -> JSString -> m Bool
 containsToken lst tkn = liftIO $ js_containsToken lst tkn
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"classList\"]"
+        js_classList :: JSElement -> IO DOMTokenList
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"classList\"]; })"
         js_classList :: JSElement -> IO DOMTokenList
+#endif
 
 classList :: (MonadIO m) => JSElement -> m DOMTokenList
 classList e = liftIO $ js_classList e
@@ -3522,8 +4694,13 @@ class (IsJSNode obj) => CharacterData obj
 instance CharacterData JSTextNode
 
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"data\"]"
+    js_data :: JSNode -> IO JSString
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"data\"]; })"
     js_data :: JSNode -> IO JSString
+#endif
 
 
 -- | object.data
@@ -3534,8 +4711,13 @@ getCharacterData o = js_data (toJSNode o)
 -- * currentScript
 
 -- FIXME: could be a more specific JSHTMLScriptElement if we had bothered to create such a thing
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"currentScript\"]" js_currentScript ::
+  JSDocument -> IO JSVal
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"currentScript\"]; })" js_currentScript ::
   JSDocument -> IO JSVal
+#endif
 
 currentScript :: (MonadIO m) => JSDocument -> m (Maybe JSElement)
 currentScript d =
@@ -3570,24 +4752,54 @@ instance PToJSVal CaretPos where
   pToJSVal (CaretPos jsval) = jsval
   {-# INLINE pToJSVal #-}
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = document.caretPositionFromPoint"
+  hasCaretPositionFromPoint :: Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "(() => { return document.caretPositionFromPoint; })"
   hasCaretPositionFromPoint :: Bool
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"caretPositionFromPoint\"]($2,$3)"
+  caretPositionFromPoint :: JSDocument -> Double -> Double -> IO CaretPos
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => { return a1[\"caretPositionFromPoint\"](a2,a3); })"
   caretPositionFromPoint :: JSDocument -> Double -> Double -> IO CaretPos
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"offsetNode\"]"
+  offsetNode :: CaretPos -> JSNode
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"offsetNode\"]; })"
   offsetNode :: CaretPos -> JSNode
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = $1[\"offset\"]"
+  offset :: CaretPos -> Int
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => { return a1[\"offset\"]; })"
   offset :: CaretPos -> Int
+#endif
 
 
+#if __GHCJS__
+foreign import javascript unsafe "$r = document.caretRangeFromPoint"
+  hasCaretRangeFromPoint :: Bool
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "(() => { return document.caretRangeFromPoint; })"
   hasCaretRangeFromPoint :: Bool
+#endif
 
+#if __GHCJS__
+foreign import javascript unsafe "$1[\"caretRangeFromPoint\"]($2,$3)"
+  js_caretRangeFromPoint :: JSDocument -> Double -> Double -> IO (Nullable Range)
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => { return a1[\"caretRangeFromPoint\"](a2,a3); })"
   js_caretRangeFromPoint :: JSDocument -> Double -> Double -> IO (Nullable Range)
+#endif
 
 caretRangeFromPoint :: (MonadIO m) => JSDocument -> Double -> Double -> m (Maybe Range)
 caretRangeFromPoint doc x y = liftIO (nullableToMaybe <$> js_caretRangeFromPoint doc x y)

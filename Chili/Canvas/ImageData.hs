@@ -29,21 +29,24 @@ getData i = js_getData i
 {-# INLINE getData #-}
 
 #if __GHCJS__
-need to backport to ghchs
+foreign import javascript unsafe
+  "$1.width" js_width :: ImageData -> Int
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe
   "((a1) => { return a1.width; })" js_width :: ImageData -> Int
 #endif
 
 #if __GHCJS__
-need to backport to ghchs
+foreign import javascript unsafe
+  "$1.height" js_height :: ImageData -> Int
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe
   "((a1) => { return a1.height; })" js_height :: ImageData -> Int
 #endif
 
 #if __GHCJS__
-need to backport to ghchs
+foreign import javascript unsafe
+  "$1.data" js_getData :: ImageData -> Uint8ClampedArray
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe
   "((a1) => { return a1.data; })" js_getData :: ImageData -> Uint8ClampedArray
@@ -57,8 +60,13 @@ putImageData :: JSContext2D
 putImageData = js_putImageData
 {-# INLINE putImageData #-}
 
+#if __GHCJS__
+foreign import javascript unsafe "$1.putImageData($2,$3,$4)"
+  js_putImageData :: JSContext2D -> ImageData -> Int -> Int -> IO ()
+#elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4) => a1.putImageData(a2,a3,a4))"
   js_putImageData :: JSContext2D -> ImageData -> Int -> Int -> IO ()
+#endif
 
 getImageData :: JSContext2D
              -> Int -- ^ sx
@@ -70,7 +78,8 @@ getImageData = js_getImageData
 {-# INLINE getImageData #-}
 
 #if __GHCJS__
-need to backport to ghchs
+foreign import javascript unsafe "$1.getImageData($2,$3,$4,$5)"
+  js_getImageData :: JSContext2D -> Int -> Int -> Int -> Int -> IO ImageData
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4,a5) => { return a1.getImageData(a2,a3,a4,a5); })"
   js_getImageData :: JSContext2D -> Int -> Int -> Int -> Int -> IO ImageData
@@ -85,14 +94,16 @@ newImageData Nothing width height = js_newImageDataBlank width height
 newImageData (Just d) width height = js_newImageData d width height
 
 #if __GHCJS__
-need to backport to ghchs
+foreign import javascript unsafe "new ImageData($1, $2)"
+        js_newImageDataBlank :: Int -> Int -> IO ImageData
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => { return (new ImageData(a1, a2)); })"
         js_newImageDataBlank :: Int -> Int -> IO ImageData
 #endif
 
 #if __GHCJS__
-need to backport to ghchs
+foreign import javascript unsafe "new ImageData($1, $2, $3)"
+        js_newImageData :: Uint8ClampedArray -> Int -> Int -> IO ImageData
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => { return (new ImageData(a1, a2, a3)); })"
         js_newImageData :: Uint8ClampedArray -> Int -> Int -> IO ImageData

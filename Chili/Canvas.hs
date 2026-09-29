@@ -23,6 +23,9 @@ import GHCJS.Types (IsJSVal(..), JSVal(..), JSString(..))
 
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"getContext\"](\"2d\")"
+        js_getContext2d ::
+        JSElement -> IO JSVal
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"getContext\"](\"2d\"))"
         js_getContext2d ::
@@ -34,6 +37,9 @@ getContext2D elem = liftIO $ fromJSVal =<< js_getContext2d elem
 
 -- * Canvas
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"fillRect\"]($2, $3, $4, $5)"
+        js_fillRect ::
+        JSContext2D -> Double -> Double -> Double -> Double -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4,a5) => a1[\"fillRect\"](a2, a3, a4, a5))"
         js_fillRect ::
@@ -45,6 +51,9 @@ fillRect = js_fillRect
 
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"clearRect\"]($2, $3, $4, $5)"
+        js_clearRect ::
+        JSContext2D -> Double -> Double -> Double -> Double -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4,a5) => a1[\"clearRect\"](a2, a3, a4, a5))"
         js_clearRect ::
@@ -64,6 +73,9 @@ renderStyle (StyleGradient _) = error "Chili.Canvas.renderStyle (StyleGradient _
 renderStyle (StylePattern _) = error "Chili.Canvas.renderStyle (StylePattern _)"
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"fillStyle\"] = $2"
+        js_fillStyle ::
+        JSContext2D -> JSString -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"fillStyle\"] = a2)"
         js_fillStyle ::
@@ -74,6 +86,9 @@ setFillStyle :: JSContext2D -> Style -> IO ()
 setFillStyle ctx style = js_fillStyle ctx (renderStyle style)
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"strokeStyle\"] = $2"
+        js_strokeStyle ::
+        JSContext2D -> JSString -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"strokeStyle\"] = a2)"
         js_strokeStyle ::
@@ -84,6 +99,9 @@ setStrokeStyle :: JSContext2D -> Style -> IO ()
 setStrokeStyle ctx style = js_strokeStyle ctx (renderStyle style)
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"save\"]()"
+        js_save ::
+        JSContext2D -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"save\"]())"
         js_save ::
@@ -94,6 +112,9 @@ save :: (MonadIO m) => JSContext2D -> m ()
 save = liftIO . js_save
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"restore\"]()"
+        js_restore ::
+        JSContext2D -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"restore\"]())"
         js_restore ::
@@ -104,6 +125,9 @@ restore :: (MonadIO m) => JSContext2D -> m ()
 restore = liftIO . js_restore
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"moveTo\"]($2, $3)"
+        js_moveTo ::
+        JSContext2D -> Double -> Double -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"moveTo\"](a2, a3))"
         js_moveTo ::
@@ -114,6 +138,9 @@ moveTo :: (MonadIO m) => JSContext2D -> Double -> Double -> m ()
 moveTo ctx x y = liftIO $ js_moveTo ctx x y
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"lineTo\"]($2, $3)"
+        js_lineTo ::
+        JSContext2D -> Double -> Double -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"lineTo\"](a2, a3))"
         js_lineTo ::
@@ -124,6 +151,9 @@ lineTo :: (MonadIO m) => JSContext2D -> Double -> Double -> m ()
 lineTo ctx x y = liftIO $ js_lineTo ctx x y
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"arc\"]($2, $3, $4, $5, $6, $7)"
+        js_arc ::
+        JSContext2D -> Double -> Double -> Double -> Double -> Double -> Bool -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4,a5,a6,a7) => a1[\"arc\"](a2, a3, a4, a5, a6, a7))"
         js_arc ::
@@ -134,6 +164,9 @@ arc :: (MonadIO m) => JSContext2D -> Double -> Double -> Double -> Double -> Dou
 arc ctx x y radius startAngle endAngle counterClockwise = liftIO $ js_arc ctx x y radius startAngle endAngle counterClockwise
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"beginPath\"]()"
+        js_beginPath ::
+        JSContext2D -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"beginPath\"]())"
         js_beginPath ::
@@ -144,6 +177,9 @@ beginPath :: (MonadIO m) => JSContext2D -> m ()
 beginPath = liftIO . js_beginPath
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"stroke\"]()"
+        js_stroke ::
+        JSContext2D -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"stroke\"]())"
         js_stroke ::
@@ -154,6 +190,9 @@ stroke :: (MonadIO m) => JSContext2D -> m ()
 stroke = liftIO . js_stroke
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"fill\"]()"
+        js_fill ::
+        JSContext2D -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"fill\"]())"
         js_fill ::
@@ -164,6 +203,9 @@ fill :: (MonadIO m) => JSContext2D -> m ()
 fill = liftIO . js_fill
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"lineWidth\"] = $2"
+        js_setLineWidth ::
+        JSContext2D -> Double -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"lineWidth\"] = a2)"
         js_setLineWidth ::
@@ -177,6 +219,9 @@ setLineWidth ctx w = liftIO $ js_setLineWidth ctx w
 -- * Font/Text
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"font\"] = $2"
+        js_font ::
+        JSContext2D -> JSString -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"font\"] = a2)"
         js_font ::
@@ -187,6 +232,9 @@ setFont :: (MonadIO m) => JSContext2D -> JSString -> m ()
 setFont ctx font = liftIO $ js_font ctx font
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"textAlign\"] = $2"
+        js_textAlign ::
+        JSContext2D -> JSString -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"textAlign\"] = a2)"
         js_textAlign ::
@@ -212,12 +260,17 @@ setTextAlign :: (MonadIO m) => JSContext2D -> TextAlign -> m ()
 setTextAlign ctx align = liftIO $ js_textAlign ctx (textAlignToJSString align)
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"fillText\"]($2, $3, $4)"
+  js_fillText :: JSContext2D -> JSString -> Double -> Double -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4) => a1[\"fillText\"](a2, a3, a4))"
   js_fillText :: JSContext2D -> JSString -> Double -> Double -> IO ()
 #endif
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"fillText\"]($2, $3, $4, $5)"
+        js_fillTextMaxWidth ::
+        JSContext2D -> JSString -> Double -> Double -> Double -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4,a5) => a1[\"fillText\"](a2, a3, a4, a5))"
         js_fillTextMaxWidth ::
@@ -238,6 +291,8 @@ fillText ctx txt x y (Just maxWidth) = liftIO $ js_fillTextMaxWidth ctx txt x y 
 -- * Various Transformations
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"scale\"]($2, $3)"
+  js_scale :: JSContext2D -> Double -> Double -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"scale\"](a2, a3))"
   js_scale :: JSContext2D -> Double -> Double -> IO ()
@@ -247,6 +302,8 @@ scale :: (MonadIO m) => JSContext2D -> Double -> Double -> m ()
 scale ctx x y = liftIO $ js_scale ctx x y
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"rotate\"]($2)"
+  js_rotate :: JSContext2D -> Double -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2) => a1[\"rotate\"](a2))"
   js_rotate :: JSContext2D -> Double -> IO ()
@@ -260,6 +317,8 @@ rotate :: (MonadIO m) =>
 rotate ctx r = liftIO $ js_rotate ctx r
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"translate\"]($2, $3)"
+  js_translate :: JSContext2D -> Double -> Double -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3) => a1[\"translate\"](a2, a3))"
   js_translate :: JSContext2D -> Double -> Double -> IO ()

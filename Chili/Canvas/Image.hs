@@ -15,12 +15,16 @@ newtype Image    = Image      { unImage :: JSVal }
 instance IsJSVal Image
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"width\"]" width ::
+         Image -> Int
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"width\"])" width ::
          Image -> Int
 #endif
 
 #if __GHCJS__
+foreign import javascript unsafe "$1[\"height\"]" height ::
+         Image -> Int
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1) => a1[\"height\"])" height ::
          Image -> Int
@@ -35,6 +39,8 @@ drawImage = js_drawImage
 {-# INLINE drawImage #-}
 
 #if __GHCJS__
+foreign import javascript unsafe "$1.drawImage($2,$3,$4)"
+  js_drawImage :: JSContext2D -> Image -> Int -> Int -> IO ()
 #elif defined(javascript_HOST_ARCH)
 foreign import javascript unsafe "((a1,a2,a3,a4) => a1.drawImage(a2,a3,a4))"
   js_drawImage :: JSContext2D -> Image -> Int -> Int -> IO ()
