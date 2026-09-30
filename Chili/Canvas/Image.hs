@@ -15,14 +15,22 @@ newtype Image    = Image      { unImage :: JSVal }
 instance IsJSVal Image
 
 #if __GHCJS__
-#elif defined(javascript_HOST_ARCH)
+#elif (defined(javascript_HOST_ARCH) || defined(wasm32_HOST_ARCH))
+#if defined(wasm32_HOST_ARCH)
+foreign import javascript unsafe "((a1) => a1[\"width\"])($1)" width ::
+#else
 foreign import javascript unsafe "((a1) => a1[\"width\"])" width ::
+#endif
          Image -> Int
 #endif
 
 #if __GHCJS__
-#elif defined(javascript_HOST_ARCH)
+#elif (defined(javascript_HOST_ARCH) || defined(wasm32_HOST_ARCH))
+#if defined(wasm32_HOST_ARCH)
+foreign import javascript unsafe "((a1) => a1[\"height\"])($1)" height ::
+#else
 foreign import javascript unsafe "((a1) => a1[\"height\"])" height ::
+#endif
          Image -> Int
 #endif
 
@@ -35,7 +43,11 @@ drawImage = js_drawImage
 {-# INLINE drawImage #-}
 
 #if __GHCJS__
-#elif defined(javascript_HOST_ARCH)
+#elif (defined(javascript_HOST_ARCH) || defined(wasm32_HOST_ARCH))
+#if defined(wasm32_HOST_ARCH)
+foreign import javascript unsafe "((a1,a2,a3,a4) => a1.drawImage(a2,a3,a4))($1,$2,$3,$4)"
+#else
 foreign import javascript unsafe "((a1,a2,a3,a4) => a1.drawImage(a2,a3,a4))"
+#endif
   js_drawImage :: JSContext2D -> Image -> Int -> Int -> IO ()
 #endif

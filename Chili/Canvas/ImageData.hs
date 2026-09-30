@@ -30,23 +30,35 @@ getData i = js_getData i
 
 #if __GHCJS__
 need to backport to ghchs
-#elif defined(javascript_HOST_ARCH)
+#elif (defined(javascript_HOST_ARCH) || defined(wasm32_HOST_ARCH))
+#if defined(wasm32_HOST_ARCH)
+foreign import javascript unsafe "((a1) => { return a1.width; })($1)" js_width :: ImageData -> Int
+#else
 foreign import javascript unsafe
   "((a1) => { return a1.width; })" js_width :: ImageData -> Int
 #endif
-
-#if __GHCJS__
-need to backport to ghchs
-#elif defined(javascript_HOST_ARCH)
-foreign import javascript unsafe
-  "((a1) => { return a1.height; })" js_height :: ImageData -> Int
 #endif
 
 #if __GHCJS__
 need to backport to ghchs
-#elif defined(javascript_HOST_ARCH)
+#elif (defined(javascript_HOST_ARCH) || defined(wasm32_HOST_ARCH))
+#if defined(wasm32_HOST_ARCH)
+foreign import javascript unsafe "((a1) => { return a1.height; })($1)" js_height :: ImageData -> Int
+#else
+foreign import javascript unsafe
+  "((a1) => { return a1.height; })" js_height :: ImageData -> Int
+#endif
+#endif
+
+#if __GHCJS__
+need to backport to ghchs
+#elif (defined(javascript_HOST_ARCH) || defined(wasm32_HOST_ARCH))
+#if defined(wasm32_HOST_ARCH)
+foreign import javascript unsafe "((a1) => { return a1.data; })($1)" js_getData :: ImageData -> Uint8ClampedArray
+#else
 foreign import javascript unsafe
   "((a1) => { return a1.data; })" js_getData :: ImageData -> Uint8ClampedArray
+#endif
 #endif
 
 putImageData :: JSContext2D
@@ -57,7 +69,11 @@ putImageData :: JSContext2D
 putImageData = js_putImageData
 {-# INLINE putImageData #-}
 
+#if defined(wasm32_HOST_ARCH)
+foreign import javascript unsafe "((a1,a2,a3,a4) => a1.putImageData(a2,a3,a4))($1,$2,$3,$4)"
+#else
 foreign import javascript unsafe "((a1,a2,a3,a4) => a1.putImageData(a2,a3,a4))"
+#endif
   js_putImageData :: JSContext2D -> ImageData -> Int -> Int -> IO ()
 
 getImageData :: JSContext2D
@@ -71,8 +87,12 @@ getImageData = js_getImageData
 
 #if __GHCJS__
 need to backport to ghchs
-#elif defined(javascript_HOST_ARCH)
+#elif (defined(javascript_HOST_ARCH) || defined(wasm32_HOST_ARCH))
+#if defined(wasm32_HOST_ARCH)
+foreign import javascript unsafe "((a1,a2,a3,a4,a5) => { return a1.getImageData(a2,a3,a4,a5); })($1,$2,$3,$4,$5)"
+#else
 foreign import javascript unsafe "((a1,a2,a3,a4,a5) => { return a1.getImageData(a2,a3,a4,a5); })"
+#endif
   js_getImageData :: JSContext2D -> Int -> Int -> Int -> Int -> IO ImageData
 #endif
 
@@ -86,14 +106,22 @@ newImageData (Just d) width height = js_newImageData d width height
 
 #if __GHCJS__
 need to backport to ghchs
-#elif defined(javascript_HOST_ARCH)
+#elif (defined(javascript_HOST_ARCH) || defined(wasm32_HOST_ARCH))
+#if defined(wasm32_HOST_ARCH)
+foreign import javascript unsafe "((a1,a2) => { return (new ImageData(a1, a2)); })($1,$2)"
+#else
 foreign import javascript unsafe "((a1,a2) => { return (new ImageData(a1, a2)); })"
+#endif
         js_newImageDataBlank :: Int -> Int -> IO ImageData
 #endif
 
 #if __GHCJS__
 need to backport to ghchs
-#elif defined(javascript_HOST_ARCH)
+#elif (defined(javascript_HOST_ARCH) || defined(wasm32_HOST_ARCH))
+#if defined(wasm32_HOST_ARCH)
+foreign import javascript unsafe "((a1,a2,a3) => { return (new ImageData(a1, a2, a3)); })($1,$2,$3)"
+#else
 foreign import javascript unsafe "((a1,a2,a3) => { return (new ImageData(a1, a2, a3)); })"
+#endif
         js_newImageData :: Uint8ClampedArray -> Int -> Int -> IO ImageData
 #endif

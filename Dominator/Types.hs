@@ -45,6 +45,9 @@ module Dominator.Types
        , toJSNode
        ) where
 
+#if defined(wasm32_HOST_ARCH)
+import GHCJS.Types (JSString(..))
+#endif
 import Control.Concurrent.MVar (MVar)
 import Control.Monad.Trans (MonadIO(liftIO))
 import Chili.Types (Command(..), EventObjectOf, IsEvent, IsJSNode(toJSNode), JSDocument(..), JSElement(..), JSTextNode(..), JSNode(..), EventName(..), EventObject(..), MouseEvent(..), MouseEventObject(..), UniqEventName, addEventListener, addEventListenerOpt, currentDocument, eventName, execCommand, fromEventTarget, getAttribute, getChecked, getFirstChild, getElementById, getElementsByTagName, isEqualNode, item, queryCommandState, nextSibling, removeChildren, setAttribute, setChecked, setProperty, setNodeValue, target)
@@ -105,8 +108,12 @@ data DHandle =
 -- * appendChild
 
 #if __GHCJS__
-#elif defined(javascript_HOST_ARCH)
+#elif (defined(javascript_HOST_ARCH) || defined(wasm32_HOST_ARCH))
+#if defined(wasm32_HOST_ARCH)
+foreign import javascript unsafe "((a1,a2) => { return a1[\"appendChild\"](a2); })($1,$2)"
+#else
 foreign import javascript unsafe "((a1,a2) => { return a1[\"appendChild\"](a2); })"
+#endif
         js_appendChild :: JSNode -> JSNode -> IO JSNode
 #endif
 
@@ -121,8 +128,12 @@ appendChild self newChild
 -- * createTextNode
 
 #if __GHCJS__
-#elif defined(javascript_HOST_ARCH)
+#elif (defined(javascript_HOST_ARCH) || defined(wasm32_HOST_ARCH))
+#if defined(wasm32_HOST_ARCH)
+foreign import javascript unsafe "((a1,a2) => { return a1[\"createTextNode\"](a2); })($1,$2)"
+#else
 foreign import javascript unsafe "((a1,a2) => { return a1[\"createTextNode\"](a2); })"
+#endif
         js_createTextNode :: JSDocument -> JSString -> IO JSTextNode
 #endif
 
@@ -134,8 +145,12 @@ createJSTextNode document data'
 -- * createJSElement
 
 #if __GHCJS__
-#elif defined(javascript_HOST_ARCH)
+#elif (defined(javascript_HOST_ARCH) || defined(wasm32_HOST_ARCH))
+#if defined(wasm32_HOST_ARCH)
+foreign import javascript unsafe "((a1,a2) => { return a1[\"createElement\"](a2); })($1,$2)"
+#else
 foreign import javascript unsafe "((a1,a2) => { return a1[\"createElement\"](a2); })"
+#endif
         js_createJSElement :: JSDocument -> JSString -> IO JSElement
 
 #endif
